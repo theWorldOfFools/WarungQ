@@ -38,7 +38,13 @@ services:
       - ./db:/app/db:ro
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # VITE_API_URL = origin API yang dipakai browser.
+      # Lokal: http://localhost:3001 (default Dockerfile).
+      # Ngrok/HP: isi dengan URL publik tunnel, mis. https://xxxx.ngrok-free.app
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
     container_name: umkmscan-frontend
     restart: unless-stopped
     depends_on:
