@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Truck, Plus, X, Pencil, Trash2, Search, BadgeCheck, ShoppingBasket, MessageCircle } from 'lucide-react';
+import { Truck, Plus, X, Pencil, Trash2, Search, BadgeCheck, ShoppingBasket, MessageCircle, BarChart3, History, PackagePlus } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
@@ -15,6 +15,7 @@ export default function Suplier() {
   const bisaLihatHarga = pengguna?.peran === 'owner';
   const [daftar, setDaftar] = useState([]);
   const [kulakan, setKulakan] = useState([]);
+  const [laporan, setLaporan] = useState(null);
   const [cari, setCari] = useState('');
   const [form, setForm] = useState(awalSup);
   const [editId, setEditId] = useState(null);
@@ -30,14 +31,17 @@ export default function Suplier() {
     setMemuat(true);
     setGagal('');
     try {
-      const [s, k, p] = await Promise.all([
+      const [s, k, p, lap] = await Promise.all([
         api.get('/api/suppliers', { params: { q: cari } }),
         api.get('/api/suppliers/daftar-kulakan'),
         api.get('/api/products', { params: { q: cariProduk } }),
+        // Laporan statistik: boleh gagal diam-diam (DB lama sebelum migrasi 007).
+        api.get('/api/suppliers/laporan').catch(() => ({ data: null })),
       ]);
       setDaftar(s.data);
       setKulakan(k.data);
       setProduk(p.data.slice(0, 50));
+      setLaporan(lap.data);
     } catch (e) {
       setGagal(e.response?.data?.pesan || 'Gagal memuat suplier.');
     } finally {
@@ -100,6 +104,7 @@ export default function Suplier() {
       });
       setPesan('Harga suplier tersimpan — badge Termurah diperbarui otomatis.');
       setHargaForm((h) => ({ ...h, [productId]: { supplier_id: '', harga_beli: '' } }));
+      muat();
     } catch (err) {
       setGagal(err.response?.data?.pesan || 'Gagal menyimpan harga.');
     }
@@ -130,6 +135,174 @@ export default function Suplier() {
 
       <Notice tone="success">{pesan}</Notice>
       {gagal && <Notice tone="error">{gagal}</Notice>}
+
+      {/* Laporan & statistik suplier + integrasi stok */}
+      {laporan && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="rounded-2xl p-4 text-white bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 shadow-card border border-white/10">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-300">Suplier</p>
+              <p className="text-2xl font-extrabold">{laporan.ringkasan.total_suplier}</p>
+              <p className="text-[12px] text-slate-400">{laporan.ringkasan.produk_bisa_dibandingkan} barang bisa dibanding</p>
+            </div>
+            <div className="rounded-2xl p-4 bg-white border border-slate-200/70 shadow-card">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Terhubung stok</p>
+              <p className="text-2xl font-extrabold">{laporan.ringkasan.produk_terhubung}<span className="text-sm font-semibold text-slate-400">/{laporan.ringkasan.total_produk}</span></p>
+              <p className="text-[12px] text-slate-500">{laporan.ringkasan.produk_tanpa_suplier} barang belum ada suplier</p>
+            </div>
+            <div className="rounded-2xl p-4 bg-amber-50 border border-amber-200 shadow-card">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Butuh kulakan</p>
+              <p className="text-2xl font-extrabold text-amber-800">{laporan.ringkasan.barang_menipis}</p>
+              <p className="text-[12px] text-amber-700">{laporan.ringkasan.menipis_tanpa_suplier} tanpa suplier termurah</p>
+            </div>
+            <div className="rounded-2xl p-4 text-white bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-card border border-emerald-400/30">
+              {bisaLihatHarga ? (
+                <>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-100">Estimasi belanja</p>
+                  <p className="text-xl font-extrabold">{rupiah(laporan.ringkasan.estimasi_nilai_kulakan)}</p>
+                  <p className="text-[12px] text-emerald-100">Hemat {rupiah(laporan.ringkasan.potensi_hemat_per_pcs)}/pcs bila pilih termurah</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-100">Barang masuk 30 hari</p>
+                  <p className="text-2xl font-extrabold">{laporan.ringkasan.unit_masuk_30hari} <span className="text-sm font-semibold text-emerald-100">pcs</span></p>
+                  <p className="text-[12px] text-emerald-100">Nominal disensor untuk {pengguna?.peran}</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-3">
+            {/* Grafik: siapa paling sering termurah */}
+            <Card>
+              <h2 className="font-extrabold flex items-center gap-2 text-sm">
+                <BarChart3 size={16} className="text-emerald-600" /> Paling sering termurah
+              </h2>
+              {(laporan.per_suplier?.length || 0) === 0 ? (
+                <p className="mt-1 text-sm text-slate-500">Belum ada data harga — catat harga di bawah dulu ya.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {laporan.per_suplier.slice(0, 5).map((s) => {
+                    const maks = Math.max(...laporan.per_suplier.map((x) => x.menang_termurah || 0), 1);
+                    return (
+                      <div key={s.id}>
+                        <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                          <p className="truncate font-bold">{s.nama}</p>
+                          <p className="shrink-0 font-semibold text-slate-500">{s.menang_termurah} barang • {s.jumlah_produk} terhubung</p>
+                        </div>
+                        <div className="h-2 mt-1 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                            style={{ width: `${Math.min(100, ((s.menang_termurah || 0) / maks) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Menipis per kategori */}
+              {(laporan.per_kategori?.length || 0) > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {laporan.per_kategori.map((k) => (
+                    <span key={k.kategori} className="badge bg-slate-100 text-slate-700 border border-slate-200">
+                      {k.kategori}: {k.barang_menipis} menipis{bisaLihatHarga && k.estimasi_nilai != null ? ` • ${rupiah(k.estimasi_nilai)}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Integrasi stok: barang masuk + riwayat harga */}
+            <Card className="space-y-3">
+              <div>
+                <h2 className="font-extrabold flex items-center gap-2 text-sm">
+                  <PackagePlus size={16} className="text-emerald-600" /> Barang masuk 30 hari
+                </h2>
+                {(laporan.barang_masuk_30hari?.length || 0) === 0 ? (
+                  <p className="mt-1 text-[13px] text-slate-500">Belum ada barang masuk tercatat bulan ini.</p>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    {laporan.barang_masuk_30hari.map((b) => (
+                      <div key={b.nama} className="flex items-center justify-between text-[13px] rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-2">
+                        <span className="truncate font-bold">{b.nama}</span>
+                        <b className="text-emerald-700 shrink-0">+{b.unit_masuk} pcs</b>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <h2 className="font-extrabold flex items-center gap-2 text-sm">
+                  <History size={16} className="text-slate-500" /> Riwayat harga terakhir
+                </h2>
+                {(laporan.riwayat_harga?.length || 0) === 0 ? (
+                  <p className="mt-1 text-[13px] text-slate-500">Belum ada perubahan harga tercatat.</p>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    {laporan.riwayat_harga.slice(0, 5).map((r, i) => (
+                      <div key={i} className="flex items-center justify-between text-[13px] gap-2">
+                        <span className="truncate text-slate-600">
+                          {r.nama_produk} • {r.nama_suplier}
+                          <span className="text-slate-400"> • {r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : ''}</span>
+                        </span>
+                        {bisaLihatHarga && r.harga_beli != null && <b className="shrink-0">{rupiah(r.harga_beli)}</b>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Tabel report per suplier */}
+          {(laporan.per_suplier?.length || 0) > 0 && (
+            <Card className="overflow-hidden !p-0">
+              <h2 className="font-extrabold text-sm px-4 pt-4">Report per suplier</h2>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-y border-slate-200 bg-slate-50/60">
+                      <th className="px-4 py-2 font-bold">Suplier</th>
+                      <th className="px-3 py-2 font-bold text-center">Produk</th>
+                      <th className="px-3 py-2 font-bold text-center">Termurah</th>
+                      {bisaLihatHarga && <th className="px-3 py-2 font-bold text-right">Estimasi kulakan</th>}
+                      <th className="px-4 py-2 font-bold text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laporan.per_suplier.map((s) => (
+                      <tr key={s.id} className="border-b border-slate-100 last:border-0">
+                        <td className="px-4 py-2.5">
+                          <p className="font-bold">{s.nama}</p>
+                          <p className="text-xs text-slate-500">{s.kontak_wa || '-'}</p>
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-bold">{s.jumlah_produk}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="badge bg-emerald-50 text-emerald-700 border border-emerald-200">{s.menang_termurah}</span>
+                        </td>
+                        {bisaLihatHarga && <td className="px-3 py-2.5 text-right font-bold text-emerald-700">{rupiah(s.estimasi_nilai_kulakan)}</td>}
+                        <td className="px-4 py-2.5 text-right">
+                          {s.kontak_wa ? (
+                            <a
+                              className="btn !py-1.5 !px-3 !text-[12px] bg-[#25D366] text-white hover:bg-[#1fb857]"
+                              href={linkWA(s.kontak_wa, `Halo ${s.nama}, mau kulakan untuk warung ya.`)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <MessageCircle size={13} /> Chat
+                            </a>
+                          ) : <span className="text-slate-300">-</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Rekomendasi kulakan: stok menipis + suplier termurah */}
       <Card className="border-amber-200">

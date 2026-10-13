@@ -39,7 +39,7 @@ Tambah kasir/gudang di menu **Orang** (khusus Owner).
 
 1. **Stok + warna**: 🟢 Aman / 🟡 Menipis (≤ batas) / 🔴 Habis. Form tambah/ubah + tombol Barang Masuk + rekomendasi kulakan.
 2. **Kasir cepat**: kamera HP (`html5-qrcode`) + ketik manual/USB scanner, filter kategori cepat, keranjang + konfirmasi void, uang diterima → kembalian otomatis, potong stok transaksional, struk thermal 58mm di halaman terpisah `/struk/:id` (print-only, tanpa sidebar).
-3. **Suplier Pintar**: multi-suplier per barang + harga beli, badge **Termurah** otomatis, daftar belanja kulakan saat stok menipis, chat WA suplier. Harga disensor untuk kasir.
+3. **Suplier Pintar**: multi-suplier per barang + harga beli, badge **Termurah** otomatis, daftar belanja kulakan saat stok menipis, chat WA suplier. Laporan & statistik: estimasi nilai belanja, potensi hemat, menang-termurah per suplier, menipis per kategori, barang masuk 30 hari, riwayat harga. Harga disensor untuk kasir.
 4. **Dompet Harian**: kartu Uang Masuk, Perkiraan Untung Bersih, indikator kesehatan, grafik + produk terlaris, badge merah jatuh tempo, kirim rekap via WA pemilik.
 5. **Kasbon Tetangga**: catat utang + cicilan + tombol **Ingatkan via WA** → buka `wa.me/62xxx?text=draf` otomatis. Nomor `08xx` dinormalisasi ke `62xx`.
 
@@ -47,7 +47,7 @@ Tambah kasir/gudang di menu **Orang** (khusus Owner).
 
 ```
 docker-compose.yml  # db + backend + frontend (nginx)
-db/migrations/*.sql # 001 users, 002 products, 003 sales, 004 kasbon, 005 kategori, 006 suppliers
+db/migrations/*.sql # 001 users, 002 products, 003 sales, 004 kasbon, 005 kategori, 006 suppliers, 007 riwayat harga
 backend/src/        # Express: auth, products, sales, reports, debts, users, suppliers
 frontend/src/       # React Vite + Tailwind: Kasir, Stok, Suplier, Dompet, Kasbon, Orang, Struk
 ```
@@ -64,6 +64,7 @@ GET/POST /api/suppliers + PUT/DELETE (owner, gudang; kasir lihat tersensor)
 GET  /api/suppliers/oleh-produk/:productId (perbandingan harga + flag termurah)
 POST /api/suppliers/oleh-produk/:productId {supplier_id, harga_beli} (owner, gudang)
 GET  /api/suppliers/daftar-kulakan (stok menipis + suplier termurah)
+GET  /api/suppliers/laporan (ringkasan, per-suplier, per-kategori, riwayat harga, barang masuk 30 hari — owner & gudang)
 GET  /api/reports/harian?tanggal=YYYY-MM-DD  (owner only)
 GET/POST /api/debts  +  POST /api/debts/:id/bayar  +  GET /api/debts/:id/wa-link (owner only)
 GET/POST /api/users            (owner only)
