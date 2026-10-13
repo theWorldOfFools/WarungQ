@@ -1,5 +1,23 @@
 import { motion } from 'framer-motion';
 import { cn } from './cn';
+import { usePengaturan } from '../context/PengaturanContext';
+
+/** Wadah halaman responsif: penuh selebar layar bila kontenLebar aktif,
+ *  atau rata tengah berbatas bila dimatikan (Pengaturan → Preferensi aplikasi). */
+export function Wadah({ maks = 'max-w-[1100px]', className, children }) {
+  const { pengaturan } = usePengaturan();
+  return (
+    <div
+      className={cn(
+        'p-3 sm:p-6 pb-safe space-y-4 w-full',
+        pengaturan.kontenLebar ? 'max-w-none' : cn('mx-auto', maks),
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** Kartu SaaS lembut */
 export function Card({ className, children, ...rest }) {

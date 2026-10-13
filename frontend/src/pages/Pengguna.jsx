@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Users, UserPlus, ShieldCheck, Crown, Package, ShoppingCart, Power, Trash2 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
+import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
 import Konfirmasi from '../components/Konfirmasi';
 
 const PERAN_META = {
@@ -75,7 +75,7 @@ export default function Pengguna() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[900px] mx-auto w-full">
+    <Wadah maks="max-w-[900px]">
       <PageHeader
         title="Orang Warung"
         subtitle="Kelola siapa boleh buka apa — Kasir jualan, Gudang stok, Owner semua."
@@ -185,6 +185,6 @@ export default function Pengguna() {
         onYa={jalankanHapus}
         onTutup={() => setHapusTarget(null)}
       />
-    </div>
+    </Wadah>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NotebookPen, Plus, X, MessageCircle, HandCoins, CheckCircle2, Clock, AlarmClock, History, Copy, Send } from 'lucide-react';
 import api, { rupiah } from '../api/client';
-import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
+import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
 
 // Hitung status janji bayar: telat / hari ini / dekat / masih lama.
 function infoTempo(d) {
@@ -147,7 +147,7 @@ export default function Kasbon() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[900px] mx-auto w-full">
+    <Wadah maks="max-w-[900px]">
       <PageHeader
         title="Kasbon Tetangga"
         subtitle="Catat utang, terima cicilan, ingatkan via WhatsApp."
@@ -225,7 +225,7 @@ export default function Kasbon() {
       {tampil.length === 0 ? (
         <EmptyState icon={<NotebookPen size={36} />} title="Tidak ada catatan" subtitle="Belum ada kasbon pada filter ini. Catat utang baru lewat tombol di atas." />
       ) : (
-        <div className="grid gap-2.5">
+        <div className="grid xl:grid-cols-2 gap-2.5">
           <AnimatePresence initial={false}>
             {tampil.map((d) => {              const lunas = d.status === 'lunas';
               const persen = d.total_utang > 0 ? Math.round(((d.total_utang - d.sisa_utang) / d.total_utang) * 100) : 100;
@@ -393,6 +393,6 @@ export default function Kasbon() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </Wadah>
   );
 }

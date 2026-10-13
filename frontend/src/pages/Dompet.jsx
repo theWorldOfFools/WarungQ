@@ -14,7 +14,7 @@ import {
   Send,
 } from 'lucide-react';
 import api, { rupiah } from '../api/client';
-import { Card, PageHeader, StatusBadge, Skeleton } from '../components/ui';
+import { Card, PageHeader, StatusBadge, Skeleton, Wadah } from '../components/ui';
 import MiniChart from '../components/MiniChart';
 import { usePengaturan } from '../context/PengaturanContext';
 import { linkWA, drafRekapHarian } from '../utils/wa';
@@ -80,7 +80,7 @@ export default function Dompet() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[1100px] mx-auto w-full">
+    <Wadah maks="max-w-[1100px]">
       <PageHeader
         title="Dompet Harian"
         subtitle="Ringkasan uang masuk, untung, dan barang laris — bahasa warung, rapi dibaca."
@@ -235,6 +235,6 @@ export default function Dompet() {
           </Card>
         </>
       ) : null}
-    </div>
+    </Wadah>
   );
 }

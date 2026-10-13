@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Truck, Plus, X, Pencil, Trash2, Search, BadgeCheck, ShoppingBasket, MessageCircle, BarChart3, History, PackagePlus } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
+import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
 import { linkWA } from '../utils/wa';
 import { cn } from '../components/cn';
 
@@ -111,7 +111,7 @@ export default function Suplier() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[1100px] mx-auto w-full">
+    <Wadah maks="max-w-[1100px]">
       <PageHeader
         title="Suplier Pintar"
         subtitle="Bandingkan harga kulakan per barang — yang termurah otomatis ditandai."
@@ -401,13 +401,13 @@ export default function Suplier() {
 
       {/* Daftar suplier */}
       {memuat ? (
-        <div className="grid sm:grid-cols-2 gap-2.5">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {Array.from({ length: 4 }).map((_, i) => <div key={i} className="animate-pulse h-24 rounded-2xl bg-white border border-slate-200" />)}
         </div>
       ) : daftar.length === 0 ? (
         <EmptyState icon={<Truck size={36} />} title="Belum ada suplier" subtitle="Tambah agen/langganan kulakan lewat tombol di atas." />
       ) : (
-        <div className="grid sm:grid-cols-2 gap-2.5">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {daftar.map((s) => (
             <div key={s.id} className="card card-hover p-3.5">
               <div className="flex items-start justify-between gap-2">
@@ -476,6 +476,6 @@ export default function Suplier() {
           </div>
         </Card>
       )}
-    </div>
+    </Wadah>
   );
 }

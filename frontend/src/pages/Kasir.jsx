@@ -10,7 +10,7 @@ import ChangeCalculator from '../components/ChangeCalculator';
 import StrukPrint from '../components/StrukPrint';
 import Konfirmasi from '../components/Konfirmasi';
 import { urutkanKategori } from '../data/kategori';
-import { Card, PageHeader, EmptyState, Notice } from '../components/ui';
+import { Card, PageHeader, EmptyState, Notice, Wadah } from '../components/ui';
 import { usePengaturan } from '../context/PengaturanContext';
 import { cn } from '../components/cn';
 
@@ -143,7 +143,7 @@ export default function Kasir() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[1200px] mx-auto w-full">
+    <Wadah maks="max-w-[1200px]">
       <PageHeader
         title="Kasir Cepat"
         subtitle="Scan barcode, klik produk, hitung kembalian instan."
@@ -200,7 +200,7 @@ export default function Kasir() {
           </div>
 
           {memuat ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="card p-3 space-y-2">
                   <div className="animate-pulse h-20 rounded-xl bg-slate-200" />
@@ -222,7 +222,7 @@ export default function Kasir() {
               subtitle="Pilih kategori lain atau ubah kata kunci pencarian."
             />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {produkTampil.slice(0, 24).map((b, i) => (
                 <ProductCard key={b.id} barang={b} onTambah={tambah} index={i} />
               ))}
@@ -351,7 +351,7 @@ export default function Kasir() {
         onYa={jalankanKonfirm}
         onTutup={() => setKonfirm(null)}
       />
-    </div>
+    </Wadah>
   );
 }
 

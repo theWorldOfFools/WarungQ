@@ -3,7 +3,7 @@ import { Settings as IkonSetelan, Store, Printer, Bell, RotateCcw, CheckCircle2,
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePengaturan } from '../context/PengaturanContext';
-import { Card, PageHeader, Notice } from '../components/ui';
+import { Card, PageHeader, Notice, Wadah } from '../components/ui';
 import { cn } from '../components/cn';
 import { siapPasang, modeBerdiri, mintaPasang } from '../pwa';
 
@@ -41,7 +41,7 @@ export default function Pengaturan() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[900px] mx-auto w-full">
+    <Wadah maks="max-w-[900px]">
       <PageHeader
         title="Pengaturan"
         subtitle="Atur profil warung, struk cetak, dan kenyamanan aplikasi."
@@ -136,6 +136,15 @@ export default function Pengaturan() {
           }}
         />
         <Toggle
+          label="Tampilan layar penuh"
+          desc="Konten melebar mengikuti layar (tablet/desktop). Matikan untuk tampilan rata tengah."
+          aktif={pengaturan.kontenLebar}
+          onClick={() => {
+            ubah({ kontenLebar: !pengaturan.kontenLebar });
+            simpanBagian('Preferensi');
+          }}
+        />
+        <Toggle
           label="Animasi tombol & halaman"
           desc="Matikan jika HP terasa berat (segera hadir — saat ini selalu aktif)."
           aktif
@@ -181,7 +190,7 @@ export default function Pengaturan() {
           <RotateCcw size={16} /> Kembalikan bawaan
         </motion.button>
       </Card>
-    </div>
+    </Wadah>
   );
 }
 

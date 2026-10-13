@@ -11,6 +11,7 @@ const bawaan = {
   strukFooter: 'Terima kasih sudah belanja!',
   ukuranKertas: '58mm',
   sidebarRapatDefault: false,
+  kontenLebar: true,
 };
 
 const PengaturanContext = createContext(null);

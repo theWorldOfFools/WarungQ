@@ -2,7 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogOut, PanelLeft, Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePengaturan } from '../context/PengaturanContext';
 import { StatusBadge } from './ui';
+import { cn } from './cn';
 
 const WARNA_PERAN = {
   owner: 'emerald',
@@ -18,6 +20,7 @@ const LABEL_PERAN = {
 
 export default function Header({ onToggleSidebar, onBukaMenu, namaToko }) {
   const { pengguna, keluar } = useAuth();
+  const { pengaturan } = usePengaturan();
   const nav = useNavigate();
   if (!pengguna) return null;
 
@@ -25,7 +28,7 @@ export default function Header({ onToggleSidebar, onBukaMenu, namaToko }) {
 
   return (
     <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-slate-200/80">
-      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 h-16 max-w-[1200px] mx-auto">
+      <div className={cn('flex items-center gap-2 sm:gap-3 px-3 sm:px-6 h-16', pengaturan.kontenLebar ? 'max-w-none' : 'max-w-[1200px] mx-auto')}>
         {/* Toggle sidebar (desktop) */}
         <button
           onClick={onToggleSidebar}

@@ -7,7 +7,7 @@ import StockBadge from '../components/StockBadge';
 import LabelBarcodeModal from '../components/LabelBarcodeModal';
 import { KATEGORI_BAKU, urutkanKategori } from '../data/kategori';
 import { useAuth } from '../context/AuthContext';
-import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
+import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
 import { cn } from '../components/cn';
 
 const awal = { nama: '', barcode: '', kategori: 'Lainnya', harga_jual: '', modal_beli: '', stok: '', batas_menipis: 5 };
@@ -126,7 +126,7 @@ export default function Stok() {
   }
 
   return (
-    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[1100px] mx-auto w-full">
+    <Wadah maks="max-w-[1100px]">
       <PageHeader
         title="Stok Barang"
         subtitle="Pantau sisa barang & tambah stok — badge warna mudah dibaca."
@@ -298,13 +298,13 @@ export default function Stok() {
 
       {/* Daftar */}
       {memuat ? (
-        <div className="grid sm:grid-cols-2 gap-2.5">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {Array.from({ length: 4 }).map((_, i) => <div key={i} className="animate-pulse h-24 rounded-2xl bg-white border border-slate-200" />)}
         </div>
       ) : tampil.length === 0 ? (
         <EmptyState icon={<Package size={36} />} title="Tidak ada barang" subtitle="Ubah filter atau kata kunci pencarian." />
       ) : (
-        <div className="grid sm:grid-cols-2 gap-2.5">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
           <AnimatePresence initial={false}>
             {tampil.map((b) => (
               <motion.div
@@ -364,6 +364,6 @@ export default function Stok() {
           <LabelBarcodeModal produk={labelProduk} onTutup={() => setLabelProduk(null)} />
         )}
       </AnimatePresence>
-    </div>
+    </Wadah>
   );
 }
