@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: umkmscan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-warung}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-warung123}
+      POSTGRES_DB: ${DB_NAME:-umkmscan}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-warung} -d ${DB_NAME:-umkmscan}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: umkmscan-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-warung}:${DB_PASSWORD:-warung123}@db:5432/${DB_NAME:-umkmscan}
+      JWT_SECRET: ${JWT_SECRET:-ganti-rahasia-ini-di-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      PORT: 3001
+      SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-owner@warung.test}
+      SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-warung123}
+    ports:
+      - "3001:3001"
+    volumes:
+      # agar migrasi SQL ikut terbaca saat dev tanpa rebuild
+      - ./db:/app/db:ro
+
+  frontend:
+    build: ./frontend
+    container_name: umkmscan-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
