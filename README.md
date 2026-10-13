@@ -26,6 +26,9 @@ docker compose up --build
 | Lihat Modal Beli & Untung | ✅ | ❌ disensor backend | ❌ |
 | Dompet Harian | ✅ | ❌ 403 | ❌ 403 |
 | Kasbon + WA | ✅ | ❌ | ❌ |
+| Suplier + harga kulakan | ✅ | ❌ disensor | ✅ kelola |
+| Rekomendasi kulakan menipis | ✅ | ❌ | ✅ |
+| Struk thermal 58mm terpisah | ✅ | ✅ | ❌ |
 | Ubah stok / tambah barang | ✅ | ❌ | ✅ |
 | Kelola orang | ✅ | ❌ | ❌ |
 
@@ -34,18 +37,19 @@ Tambah kasir/gudang di menu **Orang** (khusus Owner).
 
 ## Fitur V1
 
-1. **Stok + warna**: 🟢 Aman / 🟡 Menipis (≤ batas) / 🔴 Habis. Form tambah/ubah + tombol Barang Masuk.
-2. **Kasir cepat**: kamera HP (`html5-qrcode`) + ketik manual/USB scanner, keranjang, total, uang diterima → kembalian otomatis, potong stok transaksional.
-3. **Dompet Harian**: kartu Uang Masuk, Perkiraan Untung Bersih, Produk Terlaris, tanpa istilah akuntansi.
-4. **Kasbon Tetangga**: catat utang + cicilan + tombol **Ingatkan via WA** → buka `wa.me/62xxx?text=draf` otomatis. Nomor `08xx` dinormalisasi ke `62xx`.
+1. **Stok + warna**: 🟢 Aman / 🟡 Menipis (≤ batas) / 🔴 Habis. Form tambah/ubah + tombol Barang Masuk + rekomendasi kulakan.
+2. **Kasir cepat**: kamera HP (`html5-qrcode`) + ketik manual/USB scanner, filter kategori cepat, keranjang + konfirmasi void, uang diterima → kembalian otomatis, potong stok transaksional, struk thermal 58mm di halaman terpisah `/struk/:id` (print-only, tanpa sidebar).
+3. **Suplier Pintar**: multi-suplier per barang + harga beli, badge **Termurah** otomatis, daftar belanja kulakan saat stok menipis, chat WA suplier. Harga disensor untuk kasir.
+4. **Dompet Harian**: kartu Uang Masuk, Perkiraan Untung Bersih, indikator kesehatan, grafik + produk terlaris, badge merah jatuh tempo, kirim rekap via WA pemilik.
+5. **Kasbon Tetangga**: catat utang + cicilan + tombol **Ingatkan via WA** → buka `wa.me/62xxx?text=draf` otomatis. Nomor `08xx` dinormalisasi ke `62xx`.
 
 ## Struktur
 
 ```
-docker-compose.yml  # db + backend + frontend
-db/migrations/*.sql # 001 users, 002 products, 003 sales, 004 kasbon
-backend/src/        # Express: auth, products, sales, reports, debts, users
-frontend/src/       # React Vite + Tailwind: Kasir, Stok, Dompet, Kasbon, Orang
+docker-compose.yml  # db + backend + frontend (nginx)
+db/migrations/*.sql # 001 users, 002 products, 003 sales, 004 kasbon, 005 kategori, 006 suppliers
+backend/src/        # Express: auth, products, sales, reports, debts, users, suppliers
+frontend/src/       # React Vite + Tailwind: Kasir, Stok, Suplier, Dompet, Kasbon, Orang, Struk
 ```
 
 ## API ringkas
@@ -55,6 +59,11 @@ POST /api/auth/login {email,password} → {token, pengguna}
 GET  /api/products?q=          (modal disensor untuk non-owner)
 POST /api/products             (owner, gudang)
 POST /api/sales {items:[{id|barcode,qty}], uang_diterima} (owner, kasir)
+GET  /api/sales/:id (detail struk + items untuk halaman /struk/:id)
+GET/POST /api/suppliers + PUT/DELETE (owner, gudang; kasir lihat tersensor)
+GET  /api/suppliers/oleh-produk/:productId (perbandingan harga + flag termurah)
+POST /api/suppliers/oleh-produk/:productId {supplier_id, harga_beli} (owner, gudang)
+GET  /api/suppliers/daftar-kulakan (stok menipis + suplier termurah)
 GET  /api/reports/harian?tanggal=YYYY-MM-DD  (owner only)
 GET/POST /api/debts  +  POST /api/debts/:id/bayar  +  GET /api/debts/:id/wa-link (owner only)
 GET/POST /api/users            (owner only)
@@ -63,7 +72,8 @@ GET/POST /api/users            (owner only)
 ## Verifikasi yang sudah lolos
 
 - `docker compose config` valid; `db` healthy (`pg_isready`).
-- Migrasi 001–004 + seed owner + 5 produk: OK.
+- Migrasi 001–006 + seed owner + produk + suplier demo: OK.
+- Login owner + kasir, sensor `modal_beli`/`harga_beli` untuk kasir, 403 dompet untuk kasir: OK.
 - Login owner + kasir, sensor `modal_beli` untuk kasir, 403 dompet untuk kasir: OK.
 - Jualan 1× Beras Rp13.500 dibayar Rp20.000 → kembalian Rp6.500, untung Rp2.000: OK.
 - Kasbon normalisasi `0812…` → `62812…` + draf WA: OK.
@@ -71,6 +81,6 @@ GET/POST /api/users            (owner only)
 
 ## Batasan V1 → V2
 
-- Bundle frontend ~800KB (html5-qrcode); V2: code-split + lazy load kamera.
+- Bundle frontend ~800KB (html5-qrcode); V2: code-split + lazy load kamera (kamera sudah lazy-load).
 - Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — sesuai keputusan.
-- Belum ada struk cetak, retur, multi-toko, dan laporan bulanan.
+- Belum ada retur, multi-toko, dan laporan bulanan.

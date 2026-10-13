@@ -43,6 +43,48 @@ async function seed() {
     );
   }
   console.log('[seed] produk demo siap');
+
+  // Demo suplier pintar (idempotent): 2 agen + harga kulakan contoh.
+  // Tabel suppliers mungkin belum ada bila migrasi 006 belum jalan — lewati diam-diam.
+  try {
+    const agen = [
+      ['Agen Sembako Murah', '0812000001', 'Pasar Induk Blok A'],
+      ['Grosir Berkah Jaya', '0812000002', 'Pasar Induk Blok B'],
+    ];
+    const idSuplier = {};
+    for (const [nama, wa, alamat] of agen) {
+      const { rows } = await pool.query(
+        `INSERT INTO suppliers (nama, kontak_wa, alamat, created_by)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT ((LOWER(nama))) DO UPDATE SET kontak_wa=EXCLUDED.kontak_wa
+         RETURNING id`,
+        [nama, wa, alamat, ownerId]
+      );
+      idSuplier[nama] = rows[0].id;
+    }
+    const hargaDemo = [
+      // barcode produk, nama suplier, harga beli
+      ['8991001000011', 'Agen Sembako Murah', 2800],
+      ['8991001000011', 'Grosir Berkah Jaya', 2950],
+      ['8991001000028', 'Agen Sembako Murah', 11500],
+      ['8991001000028', 'Grosir Berkah Jaya', 11200],
+      ['8991001000035', 'Grosir Berkah Jaya', 19500],
+    ];
+    for (const [barcode, namaSup, harga] of hargaDemo) {
+      await pool.query(
+        `INSERT INTO product_suppliers (product_id, supplier_id, harga_beli, catatan)
+         SELECT p.id, $2, $3, 'Harga demo'
+         FROM products p WHERE p.barcode=$1
+         ON CONFLICT (product_id, supplier_id)
+         DO UPDATE SET harga_beli=EXCLUDED.harga_beli`,
+        [barcode, idSuplier[namaSup], harga]
+      );
+    }
+    console.log('[seed] suplier demo siap');
+  } catch (e) {
+    console.log('[seed] suplier dilewati:', e.message);
+  }
+
   await pool.end();
 }
 

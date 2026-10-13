@@ -99,4 +99,33 @@ router.get('/', requireRole('owner', 'kasir'), async (req, res) => {
   res.json(rows);
 });
 
+// GET /api/sales/:id — detail struk + items untuk halaman cetak terpisah.
+// Gudang dilarang. Kasir: modal disensor.
+router.get('/:id', requireRole('owner', 'kasir'), async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM sales WHERE id=$1', [req.params.id]);
+  const sale = rows[0];
+  if (!sale) return res.status(404).json({ pesan: 'Struk tidak ketemu.' });
+  const { rows: items } = await pool.query(
+    `SELECT product_id, nama_snapshot AS nama, harga_snapshot AS harga_jual, qty,
+       subtotal AS subtotal, (harga_snapshot * qty) AS total_baris
+     FROM sale_items WHERE sale_id=$1 ORDER BY nama_snapshot ASC`,
+    [req.params.id]
+  );
+  const { rows: kasir } = await pool.query(
+    'SELECT nama_pengguna, nama_toko FROM users WHERE id=$1',
+    [sale.kasir_id]
+  );
+  const data = {
+    ...sale,
+    nama_toko: kasir[0]?.nama_toko || 'Warung Saya',
+    kasir: kasir[0]?.nama_pengguna || '-',
+    items,
+  };
+  if (req.user.role !== 'owner') {
+    const { total_modal, perkiraan_untung, ...aman } = data;
+    return res.json(aman);
+  }
+  res.json(data);
+});
+
 module.exports = router;

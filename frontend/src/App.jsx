@@ -11,6 +11,8 @@ import PageTransition from './components/PageTransition';
 import Login from './pages/Login';
 import Kasir from './pages/Kasir';
 import Stok from './pages/Stok';
+import Suplier from './pages/Suplier';
+import StrukPage from './pages/Struk';
 import Dompet from './pages/Dompet';
 import Kasbon from './pages/Kasbon';
 import Pengguna from './pages/Pengguna';
@@ -33,6 +35,9 @@ function Kerangka({ children }) {
   const [drawer, setDrawer] = useState(false);
   const loc = useLocation();
   const diLogin = loc.pathname === '/masuk';
+  // Halaman struk: layout print-only terpisah — tanpa sidebar/header/bottom-nav
+  // agar cetak thermal 58mm bersih dari antarmuka aplikasi.
+  const diStruk = loc.pathname.startsWith('/struk');
 
   useEffect(() => {
     setRapat(pengaturan.sidebarRapatDefault);
@@ -43,7 +48,7 @@ function Kerangka({ children }) {
     setDrawer(false);
   }, [loc.pathname]);
 
-  if (diLogin) return children;
+  if (diLogin || diStruk) return children;
 
   return (
     <div className="min-h-screen">
@@ -86,6 +91,8 @@ function Rute() {
         <Route path="/dompet" element={<Guard boleh={['owner']}><Dompet /></Guard>} />
         <Route path="/kasir" element={<Guard boleh={['owner', 'kasir']}><Kasir /></Guard>} />
         <Route path="/stok" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Stok /></Guard>} />
+        <Route path="/suplier" element={<Guard boleh={['owner', 'gudang']}><Suplier /></Guard>} />
+        <Route path="/struk/:id" element={<Guard boleh={['owner', 'kasir']}><StrukPage /></Guard>} />
         <Route path="/kasbon" element={<Guard boleh={['owner']}><Kasbon /></Guard>} />
         <Route path="/pengguna" element={<Guard boleh={['owner']}><Pengguna /></Guard>} />
         <Route path="/pengaturan" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Pengaturan /></Guard>} />

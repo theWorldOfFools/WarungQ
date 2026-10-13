@@ -1,0 +1,308 @@
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Truck, Plus, X, Pencil, Trash2, Search, BadgeCheck, ShoppingBasket, MessageCircle } from 'lucide-react';
+import api, { rupiah } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { Card, PageHeader, EmptyState, Notice, StatusBadge } from '../components/ui';
+import { linkWA } from '../utils/wa';
+import { cn } from '../components/cn';
+
+const awalSup = { nama: '', kontak_wa: '', alamat: '' };
+
+export default function Suplier() {
+  const { pengguna } = useAuth();
+  const bisaUbah = ['owner', 'gudang'].includes(pengguna?.peran);
+  const bisaLihatHarga = pengguna?.peran === 'owner';
+  const [daftar, setDaftar] = useState([]);
+  const [kulakan, setKulakan] = useState([]);
+  const [cari, setCari] = useState('');
+  const [form, setForm] = useState(awalSup);
+  const [editId, setEditId] = useState(null);
+  const [tampilForm, setTampilForm] = useState(false);
+  const [hargaForm, setHargaForm] = useState({}); // {productId: {supplier_id, harga_beli}}
+  const [produk, setProduk] = useState([]);
+  const [cariProduk, setCariProduk] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [gagal, setGagal] = useState('');
+  const [memuat, setMemuat] = useState(true);
+
+  async function muat() {
+    setMemuat(true);
+    setGagal('');
+    try {
+      const [s, k, p] = await Promise.all([
+        api.get('/api/suppliers', { params: { q: cari } }),
+        api.get('/api/suppliers/daftar-kulakan'),
+        api.get('/api/products', { params: { q: cariProduk } }),
+      ]);
+      setDaftar(s.data);
+      setKulakan(k.data);
+      setProduk(p.data.slice(0, 50));
+    } catch (e) {
+      setGagal(e.response?.data?.pesan || 'Gagal memuat suplier.');
+    } finally {
+      setMemuat(false);
+    }
+  }
+
+  useEffect(() => {
+    muat('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const butuhKulakan = useMemo(() => kulakan.filter((k) => k.stok <= k.batas_menipis), [kulakan]);
+
+  async function simpan(e) {
+    e.preventDefault();
+    setPesan('');
+    setGagal('');
+    try {
+      if (editId) await api.put(`/api/suppliers/${editId}`, form);
+      else await api.post('/api/suppliers', form);
+      setForm(awalSup);
+      setEditId(null);
+      setTampilForm(false);
+      setPesan('Suplier tersimpan.');
+      muat();
+    } catch (err) {
+      setGagal(err.response?.data?.pesan || 'Gagal menyimpan suplier.');
+    }
+  }
+
+  async function hapus(id) {
+    if (!window.confirm('Hapus suplier ini? Harga per barang ikut terhapus.')) return;
+    try {
+      await api.delete(`/api/suppliers/${id}`);
+      setPesan('Suplier dihapus.');
+      muat();
+    } catch (err) {
+      setGagal(err.response?.data?.pesan || 'Gagal menghapus.');
+    }
+  }
+
+  function mulaiUbah(s) {
+    setEditId(s.id);
+    setForm({ nama: s.nama, kontak_wa: s.kontak_wa || '', alamat: s.alamat || '' });
+    setTampilForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function simpanHarga(productId) {
+    const f = hargaForm[productId];
+    if (!f?.supplier_id || f?.harga_beli === '' || f?.harga_beli == null) {
+      setGagal('Pilih suplier dan isi harga beli dulu ya.');
+      return;
+    }
+    try {
+      await api.post(`/api/suppliers/oleh-produk/${productId}`, {
+        supplier_id: f.supplier_id,
+        harga_beli: Number(f.harga_beli),
+      });
+      setPesan('Harga suplier tersimpan — badge Termurah diperbarui otomatis.');
+      setHargaForm((h) => ({ ...h, [productId]: { supplier_id: '', harga_beli: '' } }));
+    } catch (err) {
+      setGagal(err.response?.data?.pesan || 'Gagal menyimpan harga.');
+    }
+  }
+
+  return (
+    <div className="p-3 sm:p-6 pb-safe space-y-4 max-w-[1100px] mx-auto w-full">
+      <PageHeader
+        title="Suplier Pintar"
+        subtitle="Bandingkan harga kulakan per barang — yang termurah otomatis ditandai."
+        icon={<Truck size={22} />}
+        action={
+          bisaUbah && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setTampilForm(!tampilForm);
+                setEditId(null);
+                setForm(awalSup);
+              }}
+              className="btn-primer"
+            >
+              {tampilForm ? <><X size={16} /> Tutup</> : <><Plus size={16} strokeWidth={3} /> Tambah</>}
+            </motion.button>
+          )
+        }
+      />
+
+      <Notice tone="success">{pesan}</Notice>
+      {gagal && <Notice tone="error">{gagal}</Notice>}
+
+      {/* Rekomendasi kulakan: stok menipis + suplier termurah */}
+      <Card className="border-amber-200">
+        <h2 className="font-extrabold flex items-center gap-2">
+          <ShoppingBasket size={18} className="text-amber-600" />
+          Rekomendasi kulakan
+          {butuhKulakan.length > 0 && (
+            <span className="badge bg-amber-100 text-amber-800 border border-amber-200">
+              {butuhKulakan.length} barang
+            </span>
+          )}
+        </h2>
+        {butuhKulakan.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-500">Stok aman semua. Rekomendasi muncul otomatis saat ada barang menipis/habis.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {butuhKulakan.slice(0, 10).map((k) => (
+              <div key={k.product_id} className="flex items-center gap-3 rounded-xl bg-amber-50/60 border border-amber-200/70 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm truncate">
+                    {k.nama} <span className="font-semibold text-slate-500">• sisa {k.stok}</span>
+                  </p>
+                  {k.nama_suplier ? (
+                    <p className="text-[13px] text-slate-600">
+                      Kulakan di <b>{k.nama_suplier}</b>
+                      {bisaLihatHarga && k.harga_beli != null && <> • {rupiah(k.harga_beli)}</>}
+                      <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700">
+                        <BadgeCheck size={12} /> Termurah
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-[13px] text-slate-500">Belum ada harga suplier — catat di bawah ya.</p>
+                  )}
+                </div>
+                {k.kontak_wa && (
+                  <a
+                    className="btn !py-2 !px-3 !text-[13px] bg-[#25D366] text-white hover:bg-[#1fb857] shrink-0"
+                    href={linkWA(k.kontak_wa, `Halo ${k.nama_suplier}, mau tanya harga kulakan "${k.nama}" ya.`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Chat suplier"
+                  >
+                    <MessageCircle size={14} /> Chat
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {!bisaLihatHarga && (
+          <div className="mt-2 flex justify-start">
+            <StatusBadge>Harga beli disensor untuk peran {pengguna?.peran}</StatusBadge>
+          </div>
+        )}
+      </Card>
+
+      {/* Form suplier */}
+      <AnimatePresence>
+        {bisaUbah && tampilForm && (
+          <motion.form
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={simpan}
+            className="overflow-hidden"
+          >
+            <Card className="space-y-2.5 border-emerald-200">
+              <h2 className="font-extrabold">{editId ? 'Ubah suplier' : 'Tambah suplier baru'}</h2>
+              <div className="grid sm:grid-cols-3 gap-2">
+                <input className="input-besar" placeholder="Nama suplier (mis. Agen Sembako)" value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} required />
+                <input className="input-besar" placeholder="No. WA (08...)" value={form.kontak_wa} onChange={(e) => setForm({ ...form, kontak_wa: e.target.value })} inputMode="tel" />
+                <input className="input-besar" placeholder="Alamat / pasar (opsional)" value={form.alamat} onChange={(e) => setForm({ ...form, alamat: e.target.value })} />
+              </div>
+              <motion.button whileTap={{ scale: 0.97 }} className="btn-primer w-full min-h-[48px]">Simpan</motion.button>
+            </Card>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      {/* Cari */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input-besar pl-10"
+            placeholder="Cari suplier..."
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && muat()}
+          />
+        </div>
+        <motion.button whileTap={{ scale: 0.95 }} className="btn-gelap min-h-[48px] px-5" onClick={muat}>
+          Cari
+        </motion.button>
+      </div>
+
+      {/* Daftar suplier */}
+      {memuat ? (
+        <div className="grid sm:grid-cols-2 gap-2.5">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="animate-pulse h-24 rounded-2xl bg-white border border-slate-200" />)}
+        </div>
+      ) : daftar.length === 0 ? (
+        <EmptyState icon={<Truck size={36} />} title="Belum ada suplier" subtitle="Tambah agen/langganan kulakan lewat tombol di atas." />
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-2.5">
+          {daftar.map((s) => (
+            <div key={s.id} className="card card-hover p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold leading-snug">{s.nama}</p>
+                  <p className="text-xs text-slate-500 font-medium">{s.kontak_wa || '-'} • {s.jumlah_produk} barang</p>
+                  {s.alamat && <p className="text-xs text-slate-500 truncate">{s.alamat}</p>}
+                </div>
+                {bisaUbah && (
+                  <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => mulaiUbah(s)} className="btn-lembut !py-1.5 !px-3 !text-[13px]"><Pencil size={14} /> Ubah</button>
+                    {pengguna?.peran === 'owner' && (
+                      <button onClick={() => hapus(s.id)} className="btn !py-1.5 !px-3 !text-[13px] bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Catat harga per barang */}
+      {bisaUbah && (
+        <Card className="space-y-2.5">
+          <h2 className="font-extrabold">Catat harga suplier per barang</h2>
+          <p className="text-sm text-slate-500">Pilih barang → pilih suplier → isi harga beli. Termurah otomatis jadi rekomendasi kulakan.</p>
+          <div className="relative">
+            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input pl-10"
+              placeholder="Cari barang untuk dicatat harganya..."
+              value={cariProduk}
+              onChange={(e) => setCariProduk(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && muat()}
+            />
+          </div>
+          <div className="space-y-2">
+            {produk.slice(0, 12).map((p) => {
+              const f = hargaForm[p.id] || { supplier_id: '', harga_beli: '' };
+              return (
+                <div key={p.id} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                  <p className="font-bold text-sm truncate">{p.nama} <span className="font-semibold text-slate-500">• sisa {p.stok}</span></p>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2">
+                    <select
+                      className="input"
+                      value={f.supplier_id}
+                      onChange={(e) => setHargaForm((h) => ({ ...h, [p.id]: { ...f, supplier_id: e.target.value } }))}
+                    >
+                      <option value="">— Pilih suplier —</option>
+                      {daftar.map((s) => <option key={s.id} value={s.id}>{s.nama}</option>)}
+                    </select>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      placeholder="Harga beli"
+                      value={f.harga_beli}
+                      onChange={(e) => setHargaForm((h) => ({ ...h, [p.id]: { ...f, harga_beli: e.target.value } }))}
+                    />
+                    <button onClick={() => simpanHarga(p.id)} className={cn('btn-primer min-h-[44px]')}>Simpan</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}

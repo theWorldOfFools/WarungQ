@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer } from 'lucide-react';
+import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer, ExternalLink } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 // Kamera (html5-qrcode) cukup berat — lazy-load agar bundle awal ringan.
 const BarcodeInput = lazy(() => import('../components/BarcodeInput'));
@@ -112,6 +113,8 @@ export default function Kasir() {
       });
       setPesan(data.pesan || 'Jualan tersimpan!');
       setStrukTerakhir({
+        saleId: data.id || null,
+        kode: data.kode_struk || null,
         items: [...keranjang],
         total,
         diterima,
@@ -311,6 +314,16 @@ export default function Kasir() {
               <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(strukTerakhir.kembalian)}</span></div>
               <p className="text-center text-xs text-slate-500 mt-2">{pengaturan.strukFooter}</p>
               <button onClick={cetakStruk} className="btn-lembut w-full mt-2"><Printer size={16} /> Cetak 58mm</button>
+              {strukTerakhir.saleId && (
+                <Link
+                  to={`/struk/${strukTerakhir.saleId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-besar w-full mt-2 bg-slate-900 text-white hover:bg-slate-700"
+                >
+                  <ExternalLink size={16} /> Buka halaman struk
+                </Link>
+              )}
             </motion.div>
           )}
         </Card>

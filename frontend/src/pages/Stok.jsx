@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Package, Search, Plus, Pencil, X, PackagePlus, AlertTriangle, QrCode } from 'lucide-react';
+import { Package, Search, Plus, Pencil, X, PackagePlus, AlertTriangle, QrCode, Truck } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import StockBadge from '../components/StockBadge';
 import LabelBarcodeModal from '../components/LabelBarcodeModal';
@@ -32,12 +33,18 @@ export default function Stok() {
   const [gagal, setGagal] = useState('');
   const [memuat, setMemuat] = useState(true);
   const [labelProduk, setLabelProduk] = useState(null);
+  const [kulakan, setKulakan] = useState([]);
 
   async function muat(q = cari) {
     setMemuat(true);
     try {
-      const { data } = await api.get('/api/products', { params: { q } });
-      setDaftar(data);
+      const [prod, kul] = await Promise.all([
+        api.get('/api/products', { params: { q } }),
+        // Rekomendasi kulakan: boleh gagal diam-diam (mis. DB belum migrasi) tanpa merusak halaman stok.
+        api.get('/api/suppliers/daftar-kulakan').catch(() => ({ data: [] })),
+      ]);
+      setDaftar(prod.data);
+      setKulakan(kul.data || []);
     } catch {
       setGagal('Gagal memuat stok.');
     } finally {
@@ -254,12 +261,39 @@ export default function Stok() {
         )}
       </AnimatePresence>
 
-      {/* Peringatan menipis */}
+      {/* Peringatan menipis + rekomendasi kulakan */}
       {ringkas.menipis + ringkas.habis > 0 && (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-2.5 text-sm font-semibold text-amber-900">
           <AlertTriangle size={18} className="shrink-0" />
-          {ringkas.habis > 0 ? `${ringkas.habis} barang habis` : ''}{ringkas.habis > 0 && ringkas.menipis > 0 ? ' • ' : ''}{ringkas.menipis > 0 ? `${ringkas.menipis} barang menipis` : ''} — segera belanja kulakan ya.
+          <span className="flex-1">
+            {ringkas.habis > 0 ? `${ringkas.habis} barang habis` : ''}{ringkas.habis > 0 && ringkas.menipis > 0 ? ' • ' : ''}{ringkas.menipis > 0 ? `${ringkas.menipis} barang menipis` : ''} — segera belanja kulakan ya.
+          </span>
+          {['owner', 'gudang'].includes(pengguna?.peran) && (
+            <Link to="/suplier" className="btn !py-2 !px-3 !text-[13px] bg-amber-500 text-white hover:bg-amber-600 shrink-0">
+              <Truck size={14} /> Kulakan
+            </Link>
+          )}
         </div>
+      )}
+
+      {/* Daftar belanja rekomendasi: 3 teratas menipis + suplier termurah */}
+      {kulakan.length > 0 && ['owner', 'gudang'].includes(pengguna?.peran) && (
+        <Card className="border-amber-200 !bg-amber-50/50">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-extrabold text-sm flex items-center gap-2">
+              <Truck size={16} className="text-amber-600" /> Rekomendasi kulakan hari ini
+            </h2>
+            <Link to="/suplier" className="text-[13px] font-bold text-amber-700 hover:text-amber-900">Lihat semua →</Link>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {kulakan.slice(0, 3).map((k) => (
+              <p key={k.product_id} className="text-[13px] text-slate-700">
+                • <b>{k.nama}</b> (sisa {k.stok})
+                {k.nama_suplier ? <> — kulakan di <b>{k.nama_suplier}</b>{bisaLihatModal && k.harga_beli != null && <> ({rupiah(k.harga_beli)})</>}</> : ' — belum ada suplier'}
+              </p>
+            ))}
+          </div>
+        </Card>
       )}
 
       {/* Daftar */}

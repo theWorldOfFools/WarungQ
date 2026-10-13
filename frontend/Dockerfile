@@ -1,9 +1,15 @@
-FROM node:20-alpine
+# Frontend production: build Vite sekali, sajikan via nginx (SPA fallback).
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . ./
+ARG VITE_API_URL=http://localhost:3001
+ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
-ENV PORT=80
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
-CMD ["npm", "run", "preview", "--", "--port", "80", "--host"]
+CMD ["nginx", "-g", "daemon off;"]
