@@ -32,7 +32,7 @@ services:
       SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-owner@warung.test}
       SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-warung123}
     ports:
-      - "3001:3001"
+      - "3011:3001"
     volumes:
       # agar migrasi SQL ikut terbaca saat dev tanpa rebuild
       - ./db:/app/db:ro
@@ -41,16 +41,16 @@ services:
     build:
       context: ./frontend
       # VITE_API_URL = origin API yang dipakai browser.
-      # Lokal: http://localhost:3001 (default Dockerfile).
+      # Lokal: http://localhost:3011 (default Dockerfile).
       # Ngrok/HP: isi dengan URL publik tunnel, mis. https://xxxx.ngrok-free.app
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3011}
     container_name: umkmscan-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      - "5175:80"
 
 volumes:
   pgdata:

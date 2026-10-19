@@ -38,7 +38,10 @@ const PRESETS = [
 const formAwal = { tanggal: hariIni(), kategori: 'Lainnya', keterangan: '', jumlah: '' };
 
 function tanggalTeks(s) {
-  return new Date(s + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const teks = String(s || '').slice(0, 10);
+  const d = new Date(`${teks}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return String(s || '');
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // Pengeluaran Warung — listrik, sewa, gaji, dll. Mengurangi Perkiraan Untung Bersih.

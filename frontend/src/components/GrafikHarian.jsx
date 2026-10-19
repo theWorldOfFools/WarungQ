@@ -8,7 +8,10 @@ function singkatRp(n) {
 }
 
 function labelHari(tgl) {
-  return new Date(tgl + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+  const teks = String(tgl || '');
+  const d = new Date(teks.includes('T') ? teks : `${teks}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return teks;
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
 /**

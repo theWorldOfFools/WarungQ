@@ -86,7 +86,7 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
     [dari, sampai]
   );
   const { rows: seri } = await pool.query(
-    `SELECT d::date AS tanggal,
+    `SELECT to_char(d::date, 'YYYY-MM-DD') AS tanggal,
             COALESCE(SUM(s.total_masuk) FILTER (WHERE s.dibayar_via='tunai'),0)::int AS uang_masuk,
             COALESCE(SUM(s.perkiraan_untung),0)::int AS untung
      FROM generate_series($1::date, $2::date, '1 day') d
