@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Printer, ArrowLeft, Loader2, Ban } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import StrukPrint from '../components/StrukPrint';
 import { usePengaturan } from '../context/PengaturanContext';
@@ -12,6 +12,7 @@ import { usePengaturan } from '../context/PengaturanContext';
  */
 export default function StrukPage() {
   const { id } = useParams();
+  const navigasi = useNavigate();
   const { pengaturan } = usePengaturan();
   const [data, setData] = useState(null);
   const [gagal, setGagal] = useState('');
@@ -36,6 +37,10 @@ export default function StrukPage() {
           tanggal: new Date(data.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
           kode: data.kode_struk,
           nama_toko: data.nama_toko,
+          dibayar_via: data.dibayar_via,
+          kasbon_nama: data.kasbon_nama,
+          voided_at: data.voided_at,
+          alasan_void: data.alasan_void,
         });
       } catch (e) {
         setGagal(e.response?.data?.pesan || 'Struk tidak ketemu.');
@@ -45,6 +50,11 @@ export default function StrukPage() {
     }
     muat();
   }, [id]);
+
+  function kembali() {
+    if (window.history.length > 1) navigasi(-1);
+    else navigasi('/kasir');
+  }
 
   function cetak() {
     document.body.classList.remove('mau-cetak-label');
@@ -67,13 +77,21 @@ export default function StrukPage() {
     <div className="min-h-screen bg-slate-100">
       {/* Toolbar layar — disembunyikan otomatis saat print via CSS visibility */}
       <div className="mx-auto max-w-md px-4 pt-4 flex items-center gap-2 print:hidden">
-        <Link to="/kasir" className="btn-lembut !py-2">
-          <ArrowLeft size={16} /> Kasir
-        </Link>
+        <button onClick={kembali} className="btn-lembut !py-2">
+          <ArrowLeft size={16} /> Kembali
+        </button>
         <button onClick={cetak} className="btn-primer flex-1 min-h-[48px]" disabled={!data}>
           <Printer size={16} /> Cetak 58mm
         </button>
       </div>
+
+      {data?.voided_at && (
+        <div className="mx-auto max-w-md px-4 pt-3 print:hidden">
+          <p className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold px-4 py-3 flex items-center gap-2">
+            <Ban size={16} /> Struk ini sudah DIBATALKAN{data.alasan_void ? ` — ${data.alasan_void}` : '.'}
+          </p>
+        </div>
+      )}
 
       {memuat ? (
         <p className="flex items-center justify-center gap-2 p-10 text-sm font-bold text-slate-500">
@@ -100,8 +118,20 @@ export default function StrukPage() {
               ))}
               <div className="my-2 border-t border-dashed border-slate-300" />
               <div className="flex justify-between font-bold"><span>Total</span><span>{rupiah(data?.total)}</span></div>
-              <div className="flex justify-between"><span>Diterima</span><span>{rupiah(data?.diterima)}</span></div>
-              <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(data?.kembalian)}</span></div>
+              {data?.dibayar_via === 'kasbon' ? (
+                <div className="flex justify-between font-extrabold text-amber-700">
+                  <span>Bayar</span>
+                  <span>KASBON{data?.kasbon_nama ? ` — ${data.kasbon_nama}` : ''}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between"><span>Diterima</span><span>{rupiah(data?.diterima)}</span></div>
+                  <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(data?.kembalian)}</span></div>
+                </>
+              )}
+              {data?.voided_at && (
+                <p className="mt-2 text-center font-extrabold text-rose-600">*** STRUK DIBATALKAN ***</p>
+              )}
               <p className="text-center text-xs text-slate-500 mt-2">{pengaturan.strukFooter}</p>
             </div>
           </div>

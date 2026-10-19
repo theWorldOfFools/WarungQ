@@ -12,6 +12,8 @@ import {
   RefreshCw,
   AlarmClock,
   Send,
+  NotebookPen,
+  Banknote,
 } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { Card, PageHeader, StatusBadge, Skeleton, Wadah } from '../components/ui';
@@ -49,10 +51,10 @@ export default function Dompet() {
 
   const statusKeuangan = useMemo(() => {
     if (!data) return null;
-    const untung = Number(data.perkiraan_untung_bersih || 0);
-    const masuk = Number(data.uang_masuk || 0);
+    const untung = Number(data.untung_setelah_pengeluaran ?? data.perkiraan_untung_bersih ?? 0);
+    const masuk = Number(data.uang_masuk || 0) + Number(data.penjualan_kasbon || 0);
     if (masuk === 0) return { label: 'Belum ada jualan', tone: 'slate', saran: 'Mulai jualan lewat menu Kasir ya.' };
-    if (untung <= 0) return { label: 'Perlu hemat modal', tone: 'amber', saran: 'Untung tipis — cek Modal Beli di Stok.' };
+    if (untung <= 0) return { label: 'Perlu hemat modal', tone: 'amber', saran: 'Untung tipis — cek Modal Beli dan Pengeluaran.' };
     if (untung / Math.max(masuk, 1) < 0.1) return { label: 'Cukup stabil', tone: 'sky', saran: 'Jualan jalan, untung masih bisa ditebalkan.' };
     return { label: 'Warung sehat', tone: 'emerald', saran: 'Pertahankan! Untung bersih di atas 10%.' };
   }, [data]);
@@ -71,7 +73,10 @@ export default function Dompet() {
       toko: pengaturan.namaToko || 'Warung Saya',
       tanggal: data.tanggal,
       uangMasuk: data.uang_masuk,
+      kasbon: data.penjualan_kasbon,
       untung: data.perkiraan_untung_bersih,
+      pengeluaran: data.pengeluaran_harian,
+      untungBersih: data.untung_setelah_pengeluaran,
       struk: data.jumlah_struk,
       kasbonAktif: data.utang_tetangga_aktif,
       kasbonTempo: tempo,
@@ -107,33 +112,51 @@ export default function Dompet() {
       ) : data ? (
         <>
           {/* Kartu metrik gradasi */}
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 text-white bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-card border border-emerald-400/30">
-              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-100"><Wallet size={15} /> Uang Masuk Hari Ini</p>
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-100"><Wallet size={15} /> Uang Masuk Tunai</p>
               <p className="mt-1 text-3xl font-extrabold tracking-tight">{rupiah(data.uang_masuk)}</p>
               <p className="mt-1 text-[13px] text-emerald-100 flex items-center gap-1.5"><ReceiptText size={14} /> dari {data.jumlah_struk} struk belanja</p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white shadow-card border border-white/10">
-              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-300"><TrendingUp size={15} /> Perkiraan Untung Bersih</p>
-              <p className="mt-1 text-3xl font-extrabold tracking-tight text-emerald-300">{rupiah(data.perkiraan_untung_bersih)}</p>
-              <p className="mt-1 text-[13px] text-slate-400">Uang masuk dikurangi modal beli.</p>
+            <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-900 shadow-card border border-amber-300/60">
+              <p className="flex items-center gap-1.5 text-[13px] font-bold text-amber-950/70"><NotebookPen size={15} /> Penjualan Kasbon</p>
+              <p className="mt-1 text-3xl font-extrabold tracking-tight">{rupiah(data.penjualan_kasbon || 0)}</p>
+              <p className="mt-1 text-[13px] font-medium text-amber-950/70">Dari {data.jumlah_struk_kasbon || 0} struk — uangnya belum masuk kas.</p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-900 shadow-card border border-amber-300/60">
-              <p className="flex items-center gap-1.5 text-[13px] font-bold text-amber-950/70"><HandCoins size={15} /> Utang Tetangga Aktif</p>
-              <p className="mt-1 text-3xl font-extrabold tracking-tight">{rupiah(data.utang_tetangga_aktif)}</p>
-              <p className="mt-1 text-[13px] font-medium text-amber-950/70">Masih di luar — ingatkan via WA di menu Kasbon.</p>
+            <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-rose-500 via-rose-600 to-orange-700 text-white shadow-card border border-rose-400/40">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-rose-100"><Banknote size={15} /> Pengeluaran Hari Ini</p>
+              <p className="mt-1 text-3xl font-extrabold tracking-tight">{rupiah(data.pengeluaran_harian || 0)}</p>
+              <p className="mt-1 text-[13px] text-rose-100">Listrik, sewa, dll — catat di menu Pengeluaran.</p>
+            </motion.div>
+
+            <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white shadow-card border border-white/10">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-300"><TrendingUp size={15} /> Perkiraan Untung Bersih</p>
+              <p className="mt-1 text-3xl font-extrabold tracking-tight text-emerald-300">{rupiah(data.untung_setelah_pengeluaran ?? data.perkiraan_untung_bersih)}</p>
+              <p className="mt-1 text-[13px] text-slate-400">Uang masuk − modal beli − pengeluaran.</p>
             </motion.div>
           </div>
 
-          {/* Status keuangan */}
-          {statusKeuangan && (
-            <Card className="flex flex-wrap items-center gap-3">
-              <StatusBadge tone={statusKeuangan.tone} dot>{statusKeuangan.label}</StatusBadge>
-              <p className="text-sm text-slate-600">{statusKeuangan.saran}</p>
+          {/* Utang tetangga + status keuangan */}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Card className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <HandCoins size={20} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Utang Tetangga Aktif</p>
+                <p className="text-2xl font-extrabold leading-tight">{rupiah(data.utang_tetangga_aktif)}</p>
+                <p className="text-xs text-slate-500 font-medium">Masih di luar — ingatkan via WA di menu Kasbon.</p>
+              </div>
             </Card>
-          )}
+            {statusKeuangan && (
+              <Card className="flex flex-wrap items-center gap-3">
+                <StatusBadge tone={statusKeuangan.tone} dot>{statusKeuangan.label}</StatusBadge>
+                <p className="text-sm text-slate-600">{statusKeuangan.saran}</p>
+              </Card>
+            )}
+          </div>
 
           {/* Peringatan jatuh tempo kasbon — badge merah dashboard */}
           {tempo.jumlah > 0 && (

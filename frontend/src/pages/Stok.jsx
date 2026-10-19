@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Package, Search, Plus, Pencil, X, PackagePlus, AlertTriangle, QrCode, Truck } from 'lucide-react';
+import { Package, Search, Plus, Pencil, X, PackagePlus, AlertTriangle, QrCode, Truck, History } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import StockBadge from '../components/StockBadge';
 import LabelBarcodeModal from '../components/LabelBarcodeModal';
+import RiwayatStokModal from '../components/RiwayatStokModal';
 import { KATEGORI_BAKU, urutkanKategori } from '../data/kategori';
 import { useAuth } from '../context/AuthContext';
 import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
@@ -33,6 +34,7 @@ export default function Stok() {
   const [gagal, setGagal] = useState('');
   const [memuat, setMemuat] = useState(true);
   const [labelProduk, setLabelProduk] = useState(null);
+  const [riwayatProduk, setRiwayatProduk] = useState(null);
   const [kulakan, setKulakan] = useState([]);
 
   async function muat(q = cari) {
@@ -342,6 +344,7 @@ export default function Stok() {
                       <>
                         <button onClick={() => mulaiUbah(b)} className="btn-lembut !py-1.5 !px-3 !text-[13px]"><Pencil size={14} /> Ubah</button>
                         <button onClick={() => barangMasuk(b)} className="btn !py-1.5 !px-3 !text-[13px] bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"><PackagePlus size={14} /> +1 Masuk</button>
+                        <button onClick={() => setRiwayatProduk(b)} className="btn !py-1.5 !px-3 !text-[13px] bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100" title="Riwayat masuk/jual/opname"><History size={14} /> Riwayat</button>
                       </>
                     )}
                   </div>
@@ -362,6 +365,13 @@ export default function Stok() {
       <AnimatePresence>
         {labelProduk && (
           <LabelBarcodeModal produk={labelProduk} onTutup={() => setLabelProduk(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Modal riwayat stok (masuk/jual/opname) — owner & gudang */}
+      <AnimatePresence>
+        {riwayatProduk && (
+          <RiwayatStokModal produk={riwayatProduk} onTutup={() => setRiwayatProduk(null)} />
         )}
       </AnimatePresence>
     </Wadah>

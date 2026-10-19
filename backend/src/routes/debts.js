@@ -13,14 +13,17 @@ router.use(requireRole('owner'));
 router.get('/', async (req, res) => {
   const { status = '', q = '' } = req.query;
   const params = [];
-  let where = 'WHERE nama_tetangga ILIKE $1';
+  let where = 'WHERE d.nama_tetangga ILIKE $1';
   params.push(`%${q}%`);
   if (status) {
-    where += ' AND status = $2';
+    where += ' AND d.status = $2';
     params.push(status);
   }
+  // kode_struk: asal struk bila utang dibuat dari jual kasbon di Kasir.
   const { rows } = await pool.query(
-    `SELECT * FROM debts ${where} ORDER BY created_at DESC LIMIT 200`,
+    `SELECT d.*, s.kode_struk
+     FROM debts d LEFT JOIN sales s ON s.id = d.sale_id
+     ${where} ORDER BY d.created_at DESC LIMIT 200`,
     params
   );
   res.json(rows);

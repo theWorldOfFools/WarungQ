@@ -10,10 +10,13 @@ import BottomNav from './components/BottomNav';
 import PageTransition from './components/PageTransition';
 import Login from './pages/Login';
 import Kasir from './pages/Kasir';
+import Riwayat from './pages/Riwayat';
 import Stok from './pages/Stok';
 import Suplier from './pages/Suplier';
 import StrukPage from './pages/Struk';
 import Dompet from './pages/Dompet';
+import Pengeluaran from './pages/Pengeluaran';
+import Laporan from './pages/Laporan';
 import Kasbon from './pages/Kasbon';
 import Pengguna from './pages/Pengguna';
 import Pengaturan from './pages/Pengaturan';
@@ -89,10 +92,13 @@ function Rute() {
       <Routes>
         <Route path="/masuk" element={<Login />} />
         <Route path="/dompet" element={<Guard boleh={['owner']}><Dompet /></Guard>} />
+        <Route path="/laporan" element={<Guard boleh={['owner']}><Laporan /></Guard>} />
         <Route path="/kasir" element={<Guard boleh={['owner', 'kasir']}><Kasir /></Guard>} />
+        <Route path="/riwayat" element={<Guard boleh={['owner', 'kasir']}><Riwayat /></Guard>} />
         <Route path="/stok" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Stok /></Guard>} />
         <Route path="/suplier" element={<Guard boleh={['owner', 'gudang']}><Suplier /></Guard>} />
         <Route path="/struk/:id" element={<Guard boleh={['owner', 'kasir']}><StrukPage /></Guard>} />
+        <Route path="/pengeluaran" element={<Guard boleh={['owner']}><Pengeluaran /></Guard>} />
         <Route path="/kasbon" element={<Guard boleh={['owner']}><Kasbon /></Guard>} />
         <Route path="/pengguna" element={<Guard boleh={['owner']}><Pengguna /></Guard>} />
         <Route path="/pengaturan" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Pengaturan /></Guard>} />

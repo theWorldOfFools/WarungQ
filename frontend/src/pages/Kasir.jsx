@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer, ExternalLink } from 'lucide-react';
+import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer, ExternalLink, Wallet, NotebookPen } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 // Kamera (html5-qrcode) cukup berat — lazy-load agar bundle awal ringan.
 const BarcodeInput = lazy(() => import('../components/BarcodeInput'));
@@ -20,6 +20,8 @@ export default function Kasir() {
   const [cari, setCari] = useState('');
   const [keranjang, setKeranjang] = useState([]); // {id, nama, harga_jual, qty}
   const [diterima, setDiterima] = useState(0);
+  const [bayarVia, setBayarVia] = useState('tunai'); // 'tunai' | 'kasbon'
+  const [kasbonForm, setKasbonForm] = useState({ nama_tetangga: '', no_wa: '', jatuh_tempo: '' });
   const [pesan, setPesan] = useState('');
   const [gagal, setGagal] = useState('');
   const [memuat, setMemuat] = useState(true);
@@ -81,6 +83,11 @@ export default function Kasir() {
 
   const total = useMemo(() => keranjang.reduce((s, x) => s + x.harga_jual * x.qty, 0), [keranjang]);
   const jumlahItem = useMemo(() => keranjang.reduce((s, x) => s + x.qty, 0), [keranjang]);
+  const kasbonSiap =
+    bayarVia === 'kasbon' &&
+    kasbonForm.nama_tetangga.trim() !== '' &&
+    kasbonForm.no_wa.replace(/\D/g, '').length >= 10;
+  const bisaBayar = keranjang.length > 0 && (bayarVia === 'kasbon' ? kasbonSiap : diterima >= total);
 
   // Filter kategori cepat: Semua + kategori yang dipakai toko.
   const daftarKategori = useMemo(
@@ -105,11 +112,21 @@ export default function Kasir() {
   async function bayar() {
     setPesan('');
     setGagal('');
+    const pakaiKasbon = bayarVia === 'kasbon';
     try {
       const { data } = await api.post('/api/sales', {
         items: keranjang.map((k) => ({ id: k.id, qty: k.qty })),
-        uang_diterima: diterima,
-        dibayar_via: 'tunai',
+        uang_diterima: pakaiKasbon ? 0 : diterima,
+        dibayar_via: bayarVia,
+        ...(pakaiKasbon
+          ? {
+              kasbon: {
+                nama_tetangga: kasbonForm.nama_tetangga,
+                no_wa: kasbonForm.no_wa,
+                jatuh_tempo: kasbonForm.jatuh_tempo || null,
+              },
+            }
+          : {}),
       });
       setPesan(data.pesan || 'Jualan tersimpan!');
       setStrukTerakhir({
@@ -117,12 +134,15 @@ export default function Kasir() {
         kode: data.kode_struk || null,
         items: [...keranjang],
         total,
-        diterima,
-        kembalian: (data.kembalian ?? diterima - total),
+        diterima: pakaiKasbon ? 0 : diterima,
+        kembalian: pakaiKasbon ? 0 : (data.kembalian ?? diterima - total),
+        dibayar_via: bayarVia,
+        kasbon_nama: pakaiKasbon ? kasbonForm.nama_tetangga : null,
         tanggal: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
       });
       setKeranjang([]);
       setDiterima(0);
+      if (pakaiKasbon) setKasbonForm({ nama_tetangga: '', no_wa: '', jatuh_tempo: '' });
       muat('');
     } catch (e) {
       setGagal(e.response?.data?.pesan || 'Gagal menyimpan. Cek stok & uang diterima ya.');
@@ -283,16 +303,81 @@ export default function Kasir() {
                 </AnimatePresence>
               </div>
 
-              <ChangeCalculator total={total} diterima={diterima} setDiterima={setDiterima} />
+              {/* Pilihan bayar: tunai atau kasbon (utang tetangga) */}
+              <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+                <button
+                  type="button"
+                  onClick={() => setBayarVia('tunai')}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-extrabold transition active:scale-95',
+                    bayarVia === 'tunai' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
+                  )}
+                >
+                  <Wallet size={15} /> Tunai
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBayarVia('kasbon')}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-extrabold transition active:scale-95',
+                    bayarVia === 'kasbon' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
+                  )}
+                >
+                  <NotebookPen size={15} /> Kasbon
+                </button>
+              </div>
+
+              {bayarVia === 'tunai' ? (
+                <ChangeCalculator total={total} diterima={diterima} setDiterima={setDiterima} />
+              ) : (
+                <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
+                  <p className="text-[13px] font-bold text-amber-900">
+                    Jual kasbon — utang dicatat otomatis, ditagih nanti lewat menu Kasbon.
+                  </p>
+                  <input
+                    className="input-besar"
+                    placeholder="Nama tetangga"
+                    value={kasbonForm.nama_tetangga}
+                    onChange={(e) => setKasbonForm({ ...kasbonForm, nama_tetangga: e.target.value })}
+                  />
+                  <input
+                    className="input-besar"
+                    placeholder="No. WA (08...)"
+                    inputMode="tel"
+                    value={kasbonForm.no_wa}
+                    onChange={(e) => setKasbonForm({ ...kasbonForm, no_wa: e.target.value })}
+                  />
+                  <div>
+                    <label className="label">Janji bayar (boleh dikosongkan)</label>
+                    <input
+                      className="input-besar mt-1 w-full"
+                      type="date"
+                      value={kasbonForm.jatuh_tempo}
+                      onChange={(e) => setKasbonForm({ ...kasbonForm, jatuh_tempo: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
 
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
-                className={cn('btn-besar w-full text-white shadow-sm', diterima >= total ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-300')}
+                className={cn(
+                  'btn-besar w-full text-white shadow-sm',
+                  bisaBayar
+                    ? bayarVia === 'kasbon'
+                      ? 'bg-amber-500 hover:bg-amber-600'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-slate-300'
+                )}
                 onClick={bayar}
-                disabled={diterima < total || keranjang.length === 0}
+                disabled={!bisaBayar}
               >
-                <CheckCircle2 size={19} /> Bayar {rupiah(total)}
+                {bayarVia === 'kasbon' ? (
+                  <><NotebookPen size={19} /> Simpan Kasbon {rupiah(total)}</>
+                ) : (
+                  <><CheckCircle2 size={19} /> Bayar {rupiah(total)}</>
+                )}
               </motion.button>
             </>
           )}
@@ -310,8 +395,17 @@ export default function Kasir() {
               ))}
               <div className="my-2 border-t border-dashed border-slate-300" />
               <div className="flex justify-between font-bold"><span>Total</span><span>{rupiah(strukTerakhir.total)}</span></div>
-              <div className="flex justify-between"><span>Diterima</span><span>{rupiah(strukTerakhir.diterima)}</span></div>
-              <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(strukTerakhir.kembalian)}</span></div>
+              {strukTerakhir.dibayar_via === 'kasbon' ? (
+                <div className="flex justify-between font-extrabold text-amber-700">
+                  <span>Bayar</span>
+                  <span>KASBON{strukTerakhir.kasbon_nama ? ` — ${strukTerakhir.kasbon_nama}` : ''}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between"><span>Diterima</span><span>{rupiah(strukTerakhir.diterima)}</span></div>
+                  <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(strukTerakhir.kembalian)}</span></div>
+                </>
+              )}
               <p className="text-center text-xs text-slate-500 mt-2">{pengaturan.strukFooter}</p>
               <button onClick={cetakStruk} className="btn-lembut w-full mt-2"><Printer size={16} /> Cetak 58mm</button>
               {strukTerakhir.saleId && (

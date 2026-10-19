@@ -11,6 +11,7 @@ const reportRoutes = require('./routes/reports');
 const debtRoutes = require('./routes/debts');
 const userRoutes = require('./routes/users');
 const supplierRoutes = require('./routes/suppliers');
+const expenseRoutes = require('./routes/expenses');
 
 const app = express();
 app.use(cors());
@@ -20,7 +21,7 @@ app.use(morgan('dev'));
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'sehat', aplikasi: 'UMKM-Scan V1' });
+    res.json({ status: 'sehat', aplikasi: 'UMKM-Scan V2' });
   } catch (e) {
     res.status(500).json({ status: 'db-terputus', pesan: e.message });
   }
@@ -33,6 +34,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/debts', debtRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

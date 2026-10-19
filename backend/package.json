@@ -1,7 +1,7 @@
 {
   "name": "umkmscan-backend",
   "version": "1.0.0",
-  "description": "Backend UMKM-Scan V1: kasir warung, stok, dompet harian, kasbon tetangga",
+  "description": "Backend UMKM-Scan V2: kasir warung, stok, kasbon, riwayat, pengeluaran, laporan, void struk",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

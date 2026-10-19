@@ -248,6 +248,9 @@ export default function Kasbon() {
                       <div className="min-w-0">
                         <p className="font-extrabold leading-tight truncate">{d.nama_tetangga}</p>
                         <p className="text-xs text-slate-500 font-medium">{d.no_wa || '-'}</p>
+                        {d.kode_struk && (
+                          <p className="text-[11px] font-bold text-sky-600">Dari struk {d.kode_struk}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">

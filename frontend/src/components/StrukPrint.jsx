@@ -65,14 +65,35 @@ export default function StrukPrint({ data, namaToko, header, footer }) {
           <span>Total</span>
           <span>{rupiah(data.total)}</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Bayar</span>
-          <span>{rupiah(data.diterima)}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-          <span>Kembali</span>
-          <span>{rupiah(data.kembalian)}</span>
-        </div>
+        {data.dibayar_via === 'kasbon' ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+              <span>Bayar</span>
+              <span>KASBON</span>
+            </div>
+            {data.kasbon_nama ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Atas nama</span>
+                <span>{data.kasbon_nama}</span>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Bayar</span>
+              <span>{rupiah(data.diterima)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+              <span>Kembali</span>
+              <span>{rupiah(data.kembalian)}</span>
+            </div>
+          </>
+        )}
+
+        {data.voided_at ? (
+          <div style={{ textAlign: 'center', fontWeight: 800, marginTop: '1.5mm' }}>*** STRUK DIBATALKAN ***</div>
+        ) : null}
 
         {garis()}
 

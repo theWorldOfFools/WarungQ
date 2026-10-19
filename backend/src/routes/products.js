@@ -119,6 +119,41 @@ router.delete('/:id', requireRole('owner'), async (req, res) => {
   res.json({ pesan: 'Barang dihapus.' });
 });
 
+// GET /api/products/:id/movements — riwayat stok (masuk/jual/opname). Owner & gudang.
+// Param: tipe, dari, sampai (YYYY-MM-DD), limit (default 100, maks 300).
+router.get('/:id/movements', requireRole('owner', 'gudang'), async (req, res) => {
+  const { tipe = '', dari = '', sampai = '' } = req.query;
+  const { rows: ada } = await pool.query('SELECT id, nama FROM products WHERE id=$1', [req.params.id]);
+  if (!ada[0]) return res.status(404).json({ pesan: 'Barang tidak ketemu.' });
+
+  const params = [req.params.id];
+  const where = ['sm.product_id=$1'];
+  if (['masuk', 'keluar', 'jual', 'opname'].includes(tipe)) {
+    params.push(tipe);
+    where.push(`sm.tipe=$${params.length}`);
+  }
+  if (dari) {
+    params.push(dari);
+    where.push(`sm.created_at::date >= $${params.length}`);
+  }
+  if (sampai) {
+    params.push(sampai);
+    where.push(`sm.created_at::date <= $${params.length}`);
+  }
+  const batas = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
+  params.push(batas);
+
+  const { rows } = await pool.query(
+    `SELECT sm.id, sm.tipe, sm.jumlah, sm.sisa, sm.catatan, sm.created_at,
+            u.nama_pengguna AS oleh_nama
+     FROM stock_movements sm LEFT JOIN users u ON u.id = sm.oleh
+     WHERE ${where.join(' AND ')}
+     ORDER BY sm.created_at DESC LIMIT $${params.length}`,
+    params
+  );
+  res.json({ barang: { id: ada[0].id, nama: ada[0].nama }, gerakan: rows });
+});
+
 // POST /api/products/masuk — tambah stok cepat (gudang & owner)
 router.post('/:id/masuk', requireRole('owner', 'gudang'), async (req, res) => {
   const jumlah = Number(req.body.jumlah || 0);
