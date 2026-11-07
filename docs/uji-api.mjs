@@ -141,6 +141,21 @@ const writeoffKasir = await api('POST', '/api/returns', { token: tokenKasir, bod
 cek('kasir writeoff -> 403', writeoffKasir.status === 403);
 const writeoffNol = await api('POST', '/api/returns', { token, body: { tipe: 'writeoff', product_id: produk.data[0].id, qty: 0 } });
 cek('writeoff qty 0 -> 400', writeoffNol.status === 400);
+const waStatus = await api('GET', '/api/wa/status', { token });
+cek('wa status owner -> 200 + driver', waStatus.status === 200 && typeof waStatus.data.driver === 'string');
+const waOutbox = await api('GET', '/api/wa/outbox', { token });
+cek('wa outbox owner -> array', waOutbox.status === 200 && Array.isArray(waOutbox.data));
+const waKasir = await api('GET', '/api/wa/status', { token: tokenKasir });
+cek('kasir lihat wa -> 403', waKasir.status === 403);
+const waKirimKosong = await api('POST', '/api/wa/kirim', { token, body: {} });
+cek('wa kirim tanpa tujuan/pesan -> 400', waKirimKosong.status === 400);
+const waJamBuruk = await api('PUT', '/api/wa/pengaturan', { token, body: { jam_rekap: '99:99' } });
+cek('wa pengaturan jam tidak valid -> 400', waJamBuruk.status === 400);
+const waRekapBuruk = await api('POST', '/api/wa/rekap', { token, body: { tujuan: '123' } });
+cek('wa rekap nomor tidak valid -> 400', waRekapBuruk.status === 400);
+const waKasbon404 = await api('POST', '/api/wa/kasbon/00000000-0000-4000-8000-000000000000', { token });
+cek('wa tagihan kasbon id tidak ada -> 404', waKasbon404.status === 404);
+
 
 // 5. Audit void: struk yang sudah dibatalkan tetap terlihat & tidak bisa divoid 2x
 const audit = await api('GET', '/api/sales?tampilkan_void=1&limit=200', { token });

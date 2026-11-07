@@ -15,6 +15,7 @@ const expenseRoutes = require('./routes/expenses');
 const purchaseRoutes = require('./routes/purchases');
 const shiftRoutes = require('./routes/shifts');
 const returnRoutes = require('./routes/returns');
+const waRoutes = require('./routes/wa');
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/returns', returnRoutes);
+app.use('/api/wa', waRoutes);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
@@ -51,6 +53,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 if (require.main === module) {
   app.listen(PORT, () => console.log(`[UMKM-Scan] backend jalan di :${PORT}`));
+  require('./services/waWorker').mulai();
 }
 
 module.exports = app;

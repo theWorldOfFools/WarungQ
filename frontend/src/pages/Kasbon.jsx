@@ -86,6 +86,19 @@ export default function Kasbon() {
 
   async function kirimWa() {
     if (!waPreview) return;
+    setGagal('');
+    try {
+      const { data } = await api.post(`/api/wa/kasbon/${waPreview.id}`);
+      if (data.terkirim) {
+        setPesan(`Tagihan otomatis terkirim ke ${waPreview.nama}.`);
+        setWaPreview(null);
+        muat();
+        return;
+      }
+      setPesan(data.alasan || 'WA otomatis belum aktif — membuka WhatsApp.');
+    } catch {
+      // Driver belum aktif/bermasalah: lanjutkan cara manual.
+    }
     try {
       await api.post(`/api/debts/${waPreview.id}/ingatkan`);
     } catch {}
@@ -380,13 +393,13 @@ export default function Kasbon() {
                   <X size={18} />
                 </button>
               </div>
-              <p className="mt-1 text-[13px] text-slate-500">Cek dulu pesannya — sopan, rapi, lengkap dengan rincian.</p>
+              <p className="mt-1 text-[13px] text-slate-500">Cek dulu pesannya — otomatis lewat WAHA bila aktif, atau buka WhatsApp manual.</p>
               <div className="mt-3 rounded-2xl rounded-tl-md bg-[#DCF8C6] border border-[#bfe3ab] p-3.5 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
                 {waPreview.draf}
               </div>
               <div className="mt-4 flex gap-2">
                 <button onClick={kirimWa} className="btn flex-1 bg-[#25D366] hover:bg-[#1fb857] text-white min-h-[48px]">
-                  <Send size={16} /> Buka WhatsApp
+                  <Send size={16} /> Kirim Sekarang
                 </button>
                 <button onClick={salinDraf} className="btn-lembut min-h-[48px]">
                   <Copy size={16} /> Salin

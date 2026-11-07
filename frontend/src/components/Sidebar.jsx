@@ -16,6 +16,7 @@ import {
   Banknote,
   PackagePlus,
   RotateCcw,
+  MessageCircle,
   ChevronsLeft,
   ChevronsRight,
   X,
@@ -35,6 +36,7 @@ const SEMUA = [
   { ke: '/pengeluaran', label: 'Pengeluaran', desc: 'Listrik, sewa, dll', ikon: Banknote, boleh: ['owner'] },
   { ke: '/laporan', label: 'Laporan', desc: 'Rekap periode', ikon: BarChart3, boleh: ['owner'] },
   { ke: '/kasbon', label: 'Kasbon', desc: 'Utang tetangga', ikon: NotebookPen, boleh: ['owner'] },
+  { ke: '/whatsapp', label: 'WhatsApp', desc: 'Rekap & tagihan otomatis', ikon: MessageCircle, boleh: ['owner'] },
   { ke: '/pengguna', label: 'Orang', desc: 'Kelola pegawai', ikon: Users, boleh: ['owner'] },
   { ke: '/pengaturan', label: 'Pengaturan', desc: 'Toko & aplikasi', ikon: Settings, boleh: ['owner', 'kasir', 'gudang'] },
 ];

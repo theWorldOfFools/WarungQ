@@ -68,14 +68,19 @@ Semua nilai punya default, jadi `.env` boleh dikosongkan saat awal.
 | `PORT` (container backend) | `3001` | port internal backend (tidak diubah) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` | `owner@warung.test` / `warung123` | akun owner awal |
 | `VITE_API_URL` | `http://localhost:3011` | origin API yang dipanggil browser |
+| `WA_DRIVER` | `manual` | driver WhatsApp: `manual`, `waha`, `cloudapi` |
+| `WAHA_URL` | — | base URL WAHA, mis. `http://waha:3000` (wajib untuk driver `waha`) |
+| `WAHA_SESSION` | `default` | nama sesi WAHA |
+| `WAHA_API_KEY` | — | API key WAHA bila diaktifkan |
+| `WA_OWNER_NUMBER` | — | nomor pemilik cadangan penerima rekap (`62...`) |
+| `WA_POLL_MS` / `WA_MAX_PERCOBAAN` | `30000` / `5` | jeda worker & batas percobaan kirim ulang |
 
 > Untuk akses dari HP lewat tunnel (ngrok/cloudflared), isi `VITE_API_URL`
 > dengan URL publik tunnel lalu `docker compose up --build` ulang — nginx juga
 > sudah mem-proxy `/api/` ke backend di origin yang sama agar bebas mixed-content.
 
-> **Rencana V2.0 (belum aktif):** integrasi WhatsApp otomatis akan memakai
-> WAHA self-hosted. Variabel `WA_DRIVER`, `WAHA_URL`, `WAHA_API_KEY`, dan
-> `WAHA_SESSION` didokumentasikan di
+> **WhatsApp otomatis:** gunakan WAHA self-hosted (driver `waha`) agar rekap
+> harian & tagihan kasbon terkirim tanpa membuka `wa.me`. Detail setup ada di
 > [bagian 8.2](#82-keputusan-whatsapp-waha-self-hosted).
 
 ### Dev tanpa Docker
@@ -161,6 +166,20 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 12. **PWA + responsif**: layout mobile (bottom-nav + drawer), desktop (sidebar
     lipat), pengaturan struk (58/80mm/A4), pasang ke layar utama HP.
 
+### Fitur V2.0 yang sudah aktif
+
+1. **Pembayaran non-tunai** — QRIS, transfer, e-wallet; referensi bayar,
+   rekap per metode, dan rekonsiliasi di Dompet/Laporan/struk.
+2. **Kulakan & hutang suplier** — pembelian menambah stok otomatis, cicilan
+   bayar, status belum/sebagian/lunas, jatuh tempo.
+3. **Shift / tutup kasir** — kas awal, rekap tunai/non-tunai/kasbon, refund
+   retur, hitung uang seharusnya & selisih kas fisik.
+4. **Retur parsial + rusak/expired** — retur per item dengan opsi kembali ke
+   stok, writeoff mengurangi stok dan mencatat kerugian modal.
+5. **WhatsApp otomatis + rekap terjadwal** — adapter `manual`/`waha`/`cloudapi`,
+   tabel `wa_outbox` dengan retry, rekap harian otomatis, kirim tagihan kasbon
+   otomatis dengan fallback `wa.me`.
+
 ### Akun & Peran (RBAC)
 
 | Fitur | Owner | Kasir | Gudang |
@@ -174,6 +193,7 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 | Catat pengeluaran (listrik, sewa, dll) | ✅ | ❌ | ❌ |
 | Batalkan struk (void) | ✅ | ❌ | ❌ |
 | Kasbon + WA | ✅ | ❌ (buat dari Kasir ✅) | ❌ |
+| WhatsApp otomatis & rekap terjadwal | ✅ | ❌ | ❌ |
 | Suplier + harga kulakan | ✅ | ❌ disensor | ✅ kelola |
 | Rekomendasi kulakan menipis | ✅ | ❌ | ✅ |
 | Struk thermal 58mm terpisah | ✅ | ✅ | ❌ |
@@ -202,7 +222,7 @@ Tier-1 Solo Fighter = 1 akun Owner yang login. Tambah kasir/gudang di menu **Ora
 | Migrasi | runner SQL sendiri (`backend/src/config/migrate.js`) + `db/migrations/*.sql` | tanpa ORM, urutan & riwayat tercatat di tabel `_migrations` |
 | Infra | Docker Compose + nginx | satu perintah jalan, proxy `/api` satu origin |
 | PWA | manifest + service worker (`frontend/src/pwa.js`) | pasang di HP, cache aset |
-| WhatsApp | WAHA self-hosted + adapter driver `manual`/`waha`/`cloudapi` **(rencana V2.0)** | gratis & tanpa limit pesan, REST + webhook, mudah dikustom; opsi resmi disiapkan menyusul |
+| WhatsApp | WAHA self-hosted + adapter driver `manual`/`waha`/`cloudapi` | gratis & tanpa limit pesan, REST + webhook, mudah dikustom; opsi resmi disiapkan menyusul |
 | Testing | Node fetch (`docs/uji-api.mjs`) + Playwright (`docs/e2e-ui.mjs`) | tanpa framework berat, reproducible |
 
 ---
@@ -238,7 +258,7 @@ Tier-1 Solo Fighter = 1 akun Owner yang login. Tambah kasir/gudang di menu **Ora
              ▼
 ┌────────────────────────────┐
 │  PostgreSQL 16 (5433→5432) │
-│  10 migrasi + seed demo    │
+│  15 migrasi + seed demo    │
 └────────────────────────────┘
 ```
 
@@ -256,18 +276,19 @@ backend/src/
   config/migrate.js          # runner migrasi SQL
   seed.js                    # owner + 7 produk + 2 suplier demo (idempotent)
   middleware/auth.js         # authRequired + requireRole
-  routes/*.js                # 8 modul API
+  routes/*.js                # 9 modul API
   utils/warung.js            # kode struk, normalisasi WA, draf tagihan, sensor modal
-  services/wa/*              # (rencana V2.0) adapter WhatsApp: manual/waha/cloudapi
+  services/wa.js             # adapter kirim WhatsApp: manual/waha/cloudapi + outbox
+  services/waWorker.js       # worker antrean + rekap harian terjadwal
 frontend/src/
   App.jsx                    # routing + kerangka layout
   api/client.js              # axios instance + helper rupiah
   context/*.jsx              # AuthContext, PengaturanContext (localStorage)
   components/*.jsx           # Sidebar, BottomNav, ProductCard, StrukPrint, dll
   pages/*.jsx                # Dompet, Kasir, Riwayat, Stok, Suplier, Kasbon,
-                             #   Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
+                             #   WhatsApp, Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (54 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (61 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -290,7 +311,7 @@ docs/
 | `sales.shift_id` + `debt_payments.shift_id` | menautkan transaksi & pelunasan ke shift berjalan |
 | `sale_returns` | retur jual per item + writeoff rusak/expired: qty, nilai, alasan, stok kembali/tidak |
 | `app_settings` | setelan aplikasi di server |
-| `wa_outbox` | (rencana V2.0) antrean pesan WhatsApp + status kirim/retry |
+| `wa_outbox` | antrean pesan WhatsApp: tipe, tujuan, status, percobaan, jadwal retry, error |
 
 ### Keputusan desain yang dijaga
 
@@ -363,11 +384,15 @@ DELETE /api/suppliers/oleh-produk/:productId/:linkId
 
 GET/POST/PUT/DELETE /api/users            (owner only; hapus akun sendiri ditolak)
 
-# Rencana V2.0 (belum aktif)
-POST /api/wa/kirim {nomor, pesan}         (driver aktif: manual/waha/cloudapi)
-GET  /api/wa/status                       (status sesi WAHA)
-GET  /api/wa/qr                           (QR pairing sesi WAHA)
-POST /api/wa/webhook                      (callback delivered/read/opt-out)
+# WhatsApp otomatis (owner only)
+GET  /api/wa/status                       (driver, kesiapan, setelan, hitungan outbox)
+GET  /api/wa/outbox?status=&limit=         (antrean pesan)
+GET  /api/wa/pengaturan
+PUT  /api/wa/pengaturan {no_pemilik,jam_rekap,rekap_aktif}
+POST /api/wa/kirim {tujuan,pesan}          (kirim langsung via driver aktif)
+POST /api/wa/rekap {tanggal,tujuan?}       (rekap harian manual)
+POST /api/wa/kasbon/:id                    (tagihan kasbon otomatis)
+POST /api/wa/proses                        (proses ulang antrean)
 ```
 
 ---
@@ -378,7 +403,7 @@ Pengujian dilakukan 4 lapis — dari bawah (infrastruktur) ke atas (perilaku pen
 
 | # | Lapis | Alat | Cakupan |
 |---|---|---|---|
-| 1 | Migrasi & seed | `docker compose logs backend`, tabel `_migrations` | 10 migrasi idempotent, seed owner + 7 produk + 2 suplier |
+| 1 | Migrasi & seed | `docker compose logs backend`, tabel `_migrations` | 15 migrasi idempotent, seed owner + 7 produk + 2 suplier |
 | 2 | Build statis | `npm run build` (Vite) | produksi frontend sukses tanpa error |
 | 3 | API & RBAC otomatis | `node docs/uji-api.mjs` (tanpa framework) | health, auth, validasi 400/404, sensor modal, matriks 403 per peran, audit void |
 | 4 | E2E UI + visual | `node docs/e2e-ui.mjs` (Playwright headless) | alur nyata owner lewat browser + screenshot tiap halaman |
@@ -389,7 +414,7 @@ Pengujian dilakukan 4 lapis — dari bawah (infrastruktur) ke atas (perilaku pen
 # 1) stack hidup
 cp .env.example .env && docker compose up --build -d
 
-# 2) uji API & RBAC (33 skenario)
+# 2) uji API & RBAC (61 skenario)
 node docs/uji-api.mjs
 
 # 3) uji E2E UI + regenerate screenshot (Playwright dipasang di frontend/)
@@ -419,17 +444,18 @@ Chromium 151 headless 1440×900 + 390×844, timezone `Asia/Jakarta`.
 
 | Uji | Perintah | Hasil |
 |---|---|---|
-| API & RBAC | `node docs/uji-api.mjs` | **33 lolos / 0 gagal** |
+| API & RBAC | `node docs/uji-api.mjs` | **61 lolos / 0 gagal** |
 | E2E UI | `node docs/e2e-ui.mjs` | **selesai, 18 screenshot** (tanpa error) |
 
-Cakupan 33 skenario API: health + koneksi DB; login salah sandi (401), email
+Cakupan 61 skenario API: health + koneksi DB; login salah sandi (401), email
 tidak valid (400), tanpa token (401); owner melihat `modal_beli`/`total_modal`
 dan `seri_harian` format `YYYY-MM-DD`; kasir & gudang menerima 403 di
 `reports`, `expenses`, `debts`, `products/:id/movements`, `POST /sales`, dan
 void; sensor `modal_beli`/`total_modal` untuk non-owner; validasi
 `expenses=0`, keranjang kosong, kasbon tanpa nama, debts tanpa nama, produk
-tidak ada (404); audit void (`tampilkan_void=1`, void kedua 400); akun uji
-dibuat lalu dihapus dan tidak bisa login lagi.
+tidak ada (404); audit void (`tampilkan_void=1`, void kedua 400); status &
+antrean WhatsApp, validasi kirim/rekap/pengaturan, serta RBAC kasir (403);
+akun uji dibuat lalu dihapus dan tidak bisa login lagi.
 
 ### Alur end-to-end yang diuji lewat UI
 
@@ -523,7 +549,7 @@ laporan akuntansi berat.
 | 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ✅ Selesai |
 | 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ✅ Selesai |
 | 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ✅ Selesai |
-| 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ⏳ Rencana |
+| 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ✅ Selesai |
 | 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ⏳ Rencana |
 | 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ⏳ Rencana |
 | 8 | **Multi-outlet + harga grosir/member** | UMKM naik kelas biasanya buka cabang atau punya pelanggan langganan | Isolasi data per outlet, peran, harga bertingkat | ⏳ Rencana |
@@ -544,17 +570,26 @@ gateway kredit lokal atau Cloud API resmi.
 | Meta Cloud API (resmi) | Berbayar per pesan (+62: ±Rp356 utility/service, ±Rp586 marketing) | Terikat kebijakan & template Meta | Paling aman/patuh, tidak "tanpa limit" |
 | Fonnte/WABLAS | Kredit/langganan + limit | Rendah | Tidak sesuai kebutuhan |
 
-Rancangan integrasi:
+Implementasi saat ini:
 
-- `backend/src/services/wa/index.js` — pilih driver dari `WA_DRIVER`:
-  `manual` (perilaku sekarang, tautan `wa.me`), `waha`, atau `cloudapi`.
-- `waha.js` — kirim teks/media, cek sesi, ambil QR pairing.
-- `cloudapi.js` — disiapkan untuk opsi resmi di masa depan.
-- `manual.js` — fallback `wa.me` agar fitur lama tetap jalan.
-- Tabel `wa_outbox` — antrean pesan + status/retry supaya pengiriman tidak
-  memblokir transaksi dan tidak hilang saat sesi putus.
-- Service `waha` di `docker-compose.yml` + volume sesi persisten.
-- Env: `WA_DRIVER`, `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`.
+- `backend/src/services/wa.js` — satu adapter untuk driver `manual`, `waha`
+  (REST `/api/sendText`, `chatId` dinormalisasi ke `62...@c.us`), dan
+  `cloudapi` (Graph API). Driver `manual` tidak mengirim; UI memakai `wa.me`.
+- Tabel `wa_outbox` — pesan disimpan dulu, worker mengirim & retry tiap 2 menit
+  sampai `WA_MAX_PERCOBAAN`, sehingga transaksi tidak memblokir dan pesan tidak
+  hilang saat sesi WAHA putus.
+- `backend/src/services/waWorker.js` — memproses antrean tiap `WA_POLL_MS` dan
+  mengantre rekap harian setelah jam yang diatur (zona WIB, sekali per tanggal).
+- Setelan `wa_no_pemilik`, `wa_jam_rekap`, `wa_rekap_aktif` disimpan di
+  `app_settings` lewat halaman `/whatsapp` (owner only).
+- Halaman `/whatsapp`: status driver, pengaturan rekap, kirim tes, kirim rekap
+  manual, proses antrean, dan riwayat pesan.
+- Kasbon: tombol kirim mencoba otomatis lebih dulu; bila driver belum aktif,
+  pengguna diarahkan ke tautan `wa.me` seperti sebelumnya.
+- Env: `WA_DRIVER`, `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`,
+  `WA_OWNER_NUMBER`, `WA_POLL_MS`, `WA_MAX_PERCOBAAN`.
+- WAHA dijalankan terpisah (self-hosted) dan diarahkan lewat `WAHA_URL`;
+  sesi WAHA harus sudah ter-pairing sebelum pengiriman otomatis dipakai.
 
 Risiko & mitigasi: gunakan **nomor khusus** (bukan nomor pribadi owner), kirim
 hanya pesan transaksional (rekap & tagihan), beri rate-limit/jeda, dan sediakan
@@ -563,10 +598,10 @@ Cloud API tanpa mengubah logika bisnis.
 
 ### 8.3 Batasan saat ini
 
-- Bundle frontend ~970KB (html5-qrcode) — kandidat code-split/lazy load lanjutan
+- Bundle frontend ~1.07MB (html5-qrcode) — kandidat code-split/lazy load lanjutan
   (kamera sudah lazy-load).
-- Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — akan digantikan
-  rencana 8.2.
+- WhatsApp otomatis bergantung pada WAHA yang ter-pairing; status *delivered/read*
+  belum dilacak lewat webhook (baru status kirim dari API).
 - Void struk penuh tetap tersedia untuk koreksi; retur parsial & barang rusak/expired ada di 8.1 #4.
 - Belum ada multi-toko (rencana 8.1 #8). Hutang ke suplier sudah aktif di 8.1 #2.
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat

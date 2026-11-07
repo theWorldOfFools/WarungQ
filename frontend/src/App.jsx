@@ -21,6 +21,7 @@ import Dompet from './pages/Dompet';
 import Pengeluaran from './pages/Pengeluaran';
 import Laporan from './pages/Laporan';
 import Kasbon from './pages/Kasbon';
+import WhatsApp from './pages/WhatsApp';
 import Pengguna from './pages/Pengguna';
 import Pengaturan from './pages/Pengaturan';
 import { cn } from './components/cn';
@@ -106,6 +107,7 @@ function Rute() {
         <Route path="/struk/:id" element={<Guard boleh={['owner', 'kasir']}><StrukPage /></Guard>} />
         <Route path="/pengeluaran" element={<Guard boleh={['owner']}><Pengeluaran /></Guard>} />
         <Route path="/kasbon" element={<Guard boleh={['owner']}><Kasbon /></Guard>} />
+        <Route path="/whatsapp" element={<Guard boleh={['owner']}><WhatsApp /></Guard>} />
         <Route path="/pengguna" element={<Guard boleh={['owner']}><Pengguna /></Guard>} />
         <Route path="/pengaturan" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Pengaturan /></Guard>} />
         <Route path="/" element={<RuteAwal />} />
