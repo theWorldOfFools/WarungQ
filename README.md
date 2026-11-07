@@ -267,7 +267,7 @@ frontend/src/
   pages/*.jsx                # Dompet, Kasir, Riwayat, Stok, Suplier, Kasbon,
                              #   Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (48 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (54 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -286,8 +286,9 @@ docs/
 | `suppliers` + `product_suppliers` + riwayat | multi-suplier per barang + harga beli |
 | `supplier_purchases` + `supplier_purchase_items` | kulakan per suplier: total, dibayar, sisa, jatuh tempo, snapshot barang |
 | `supplier_payments` | cicilan bayar hutang kulakan + pelaku |
-| `shifts` | shift kasir: kas awal, tunai/non-tunai/kasbon, pelunasan, kas fisik, selisih |
+| `shifts` | shift kasir: kas awal, tunai/non-tunai/kasbon, pelunasan, refund retur, kas fisik, selisih |
 | `sales.shift_id` + `debt_payments.shift_id` | menautkan transaksi & pelunasan ke shift berjalan |
+| `sale_returns` | retur jual per item + writeoff rusak/expired: qty, nilai, alasan, stok kembali/tidak |
 | `app_settings` | setelan aplikasi di server |
 | `wa_outbox` | (rencana V2.0) antrean pesan WhatsApp + status kirim/retry |
 
@@ -341,6 +342,10 @@ GET  /api/shifts/aktif                       (shift terbuka milik pengguna)
 GET  /api/shifts/:id                         (detail + hitungan live)
 POST /api/shifts/buka {kas_awal}             (owner, kasir)
 POST /api/shifts/:id/tutup {kas_fisik,catatan} (owner / pemilik shift; hitung selisih)
+
+GET  /api/returns?tipe=&dari=&sampai=&sale_id=&product_id=
+POST /api/returns {tipe:"retur_jual",sale_id,product_id,qty,...}  (owner, kasir)
+POST /api/returns {tipe:"writeoff",product_id,qty,alasan}          (owner, gudang)
 
 GET  /api/debts
 POST /api/debts
@@ -517,7 +522,7 @@ laporan akuntansi berat.
 | 1 | **Pembayaran non-tunai (QRIS/transfer/e-wallet)** + rekonsiliasi | QRIS sudah lazim di warung/kios; saat ini `sales.dibayar_via` hanya `tunai`/`kasbon`, jadi uang non-tunai tidak tercatat rapi | Tambah metode bayar + bukti + laporan per metode | ✅ Selesai |
 | 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ✅ Selesai |
 | 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ✅ Selesai |
-| 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ⏳ Rencana |
+| 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ✅ Selesai |
 | 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ⏳ Rencana |
 | 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ⏳ Rencana |
 | 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ⏳ Rencana |
@@ -562,7 +567,7 @@ Cloud API tanpa mengubah logika bisnis.
   (kamera sudah lazy-load).
 - Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — akan digantikan
   rencana 8.2.
-- Retur = **void struk penuh**; belum ada retur parsial per item (rencana 8.1 #4).
+- Void struk penuh tetap tersedia untuk koreksi; retur parsial & barang rusak/expired ada di 8.1 #4.
 - Belum ada multi-toko (rencana 8.1 #8). Hutang ke suplier sudah aktif di 8.1 #2.
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat
   `docs/e2e-ui.mjs`.

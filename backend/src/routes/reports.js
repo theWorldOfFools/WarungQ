@@ -27,6 +27,12 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
     `SELECT COALESCE(SUM(jumlah),0)::int AS pengeluaran FROM expenses WHERE tanggal = $1`,
     [tanggal]
   );
+  const { rows: retur } = await pool.query(
+    `SELECT COALESCE(SUM(total_nilai) FILTER (WHERE tipe = 'retur_jual'),0)::int AS retur_nilai,
+            COALESCE(SUM(total_nilai) FILTER (WHERE tipe = 'writeoff'),0)::int AS kerugian_stok
+     FROM sale_returns WHERE created_at::date = $1`,
+    [tanggal]
+  );
   // Rekonsiliasi per metode bayar: tunai, QRIS, transfer, e-wallet, kasbon.
   const { rows: perMetode } = await pool.query(
     `SELECT dibayar_via AS metode, COUNT(*)::int AS jumlah_struk,
@@ -61,7 +67,10 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
     total_modal: ringkas[0].total_modal,
     perkiraan_untung_bersih: ringkas[0].perkiraan_untung_bersih,
     pengeluaran_harian: pengeluaranHarian,
-    untung_setelah_pengeluaran: ringkas[0].perkiraan_untung_bersih - pengeluaranHarian,
+    retur_nilai: retur[0].retur_nilai,
+    kerugian_stok: retur[0].kerugian_stok,
+    untung_setelah_pengeluaran:
+      ringkas[0].perkiraan_untung_bersih - pengeluaranHarian - retur[0].retur_nilai - retur[0].kerugian_stok,
     jumlah_struk: ringkas[0].jumlah_struk,
     produk_terlaris: laris,
     per_metode_bayar: perMetode,
@@ -95,6 +104,12 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
   );
   const { rows: pengeluaran } = await pool.query(
     `SELECT COALESCE(SUM(jumlah),0)::int AS total FROM expenses WHERE tanggal BETWEEN $1 AND $2`,
+    [dari, sampai]
+  );
+  const { rows: retur } = await pool.query(
+    `SELECT COALESCE(SUM(total_nilai) FILTER (WHERE tipe = 'retur_jual'),0)::int AS retur_nilai,
+            COALESCE(SUM(total_nilai) FILTER (WHERE tipe = 'writeoff'),0)::int AS kerugian_stok
+     FROM sale_returns WHERE created_at::date BETWEEN $1 AND $2`,
     [dari, sampai]
   );
   const { rows: seri } = await pool.query(
@@ -155,7 +170,10 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
     total_modal: ringkas[0].total_modal,
     untung_kotor: ringkas[0].untung_kotor,
     pengeluaran: totalPengeluaran,
-    untung_bersih: ringkas[0].untung_kotor - totalPengeluaran,
+    retur_nilai: retur[0].retur_nilai,
+    kerugian_stok: retur[0].kerugian_stok,
+    untung_bersih:
+      ringkas[0].untung_kotor - totalPengeluaran - retur[0].retur_nilai - retur[0].kerugian_stok,
     jumlah_struk: ringkas[0].jumlah_struk,
     jumlah_void: strukVoid[0].jumlah,
     seri_harian: seri,

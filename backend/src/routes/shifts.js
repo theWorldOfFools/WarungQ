@@ -23,7 +23,12 @@ async function hitungShift(q, shiftId) {
     'SELECT COALESCE(SUM(jumlah_bayar), 0)::int AS total_pelunasan FROM debt_payments WHERE shift_id = $1',
     [shiftId]
   );
-  return { ...rows[0], total_pelunasan: bayar[0].total_pelunasan };
+  const { rows: retur } = await q.query(
+    `SELECT COALESCE(SUM(total_nilai), 0)::int AS total_refund
+     FROM sale_returns WHERE shift_id = $1 AND tipe = 'retur_jual'`,
+    [shiftId]
+  );
+  return { ...rows[0], total_pelunasan: bayar[0].total_pelunasan, total_refund: retur[0].total_refund };
 }
 
 const bolehLihat = (req, shift) => req.user.role === 'owner' || shift.kasir_id === req.user.id;
@@ -39,7 +44,7 @@ router.get('/aktif', async (req, res) => {
   );
   if (!rows[0]) return res.json(null);
   const hitungan = await hitungShift(pool, rows[0].id);
-  res.json({ ...rows[0], ...hitungan, uang_seharusnya: rows[0].kas_awal + hitungan.total_tunai + hitungan.total_pelunasan });
+  res.json({ ...rows[0], ...hitungan, uang_seharusnya: rows[0].kas_awal + hitungan.total_tunai + hitungan.total_pelunasan - hitungan.total_refund });
 });
 
 // GET /api/shifts — riwayat shift (owner: semua, kasir: milik sendiri).
@@ -126,16 +131,16 @@ router.post('/:id/tutup', async (req, res) => {
     }
 
     const h = await hitungShift(client, shift.id);
-    const seharusnya = Number(shift.kas_awal) + h.total_tunai + h.total_pelunasan;
+    const seharusnya = Number(shift.kas_awal) + h.total_tunai + h.total_pelunasan - h.total_refund;
     const selisih = kasFisik - seharusnya;
     const { rows: upd } = await client.query(
       `UPDATE shifts SET
          status = 'tutup', selesai = NOW(), kas_fisik = $1,
          total_tunai = $2, total_non_tunai = $3, total_kasbon = $4,
          total_pelunasan = $5, jumlah_transaksi = $6,
-         uang_seharusnya = $7, selisih = $8, catatan = $9, updated_at = NOW()
-       WHERE id = $10 RETURNING *`,
-      [kasFisik, h.total_tunai, h.total_non_tunai, h.total_kasbon, h.total_pelunasan, h.jumlah_transaksi, seharusnya, selisih, catatan, shift.id]
+         uang_seharusnya = $7, selisih = $8, catatan = $9, total_refund = $10, updated_at = NOW()
+       WHERE id = $11 RETURNING *`,
+      [kasFisik, h.total_tunai, h.total_non_tunai, h.total_kasbon, h.total_pelunasan, h.jumlah_transaksi, seharusnya, selisih, catatan, h.total_refund, shift.id]
     );
     await client.query('COMMIT');
 

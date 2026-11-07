@@ -54,4 +54,12 @@ function sensorProduk(row, role) {
   return rest;
 }
 
-module.exports = { rupiah, normalisasiWA, linkWA, drafTagihan, kodeStruk, kodeKulakan, sensorProduk };
+// Kode retur: RTR-YYYYMMDD-HHMMSS-XXX
+function kodeRetur() {
+  const d = new Date();
+  const p = (x) => String(x).padStart(2, '0');
+  const tgl = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `RTR-${tgl}-${Math.floor(Math.random() * 900 + 100)}`;
+}
+
+module.exports = { rupiah, normalisasiWA, linkWA, drafTagihan, kodeStruk, kodeKulakan, kodeRetur, sensorProduk };

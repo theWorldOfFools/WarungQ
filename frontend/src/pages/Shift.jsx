@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -47,7 +48,6 @@ export default function Shift() {
   const [kasFisik, setKasFisik] = useState('');
   const [catatan, setCatatan] = useState('');
   const [tutupProses, setTutupProses] = useState(false);
-
   async function muat() {
     setMemuat(true);
     setGagal('');
@@ -175,13 +175,17 @@ export default function Shift() {
               <p className="text-[11px] font-bold uppercase text-violet-700">Pelunasan kasbon</p>
               <p className="text-lg font-extrabold text-violet-800">{rupiah(aktif.total_pelunasan)}</p>
             </div>
+            <div className="rounded-xl bg-orange-50 border border-orange-200 p-3">
+              <p className="text-[11px] font-bold uppercase text-orange-700">Refund retur</p>
+              <p className="text-lg font-extrabold text-orange-800">{rupiah(aktif.total_refund)}</p>
+            </div>
             <div className="rounded-xl bg-slate-900 text-white p-3">
               <p className="text-[11px] font-bold uppercase text-slate-300">Uang seharusnya</p>
               <p className="text-lg font-extrabold">{rupiah(aktif.uang_seharusnya)}</p>
             </div>
           </div>
           <p className="text-xs text-slate-500">
-            Uang seharusnya = kas awal + tunai masuk + pelunasan kasbon. Non-tunai tidak masuk laci.
+            Uang seharusnya = kas awal + tunai masuk + pelunasan kasbon − refund retur. Non-tunai tidak masuk laci.
           </p>
         </Card>
       ) : (
@@ -264,6 +268,9 @@ export default function Shift() {
                         <span className="flex items-center gap-1"><Banknote size={12} /> Tunai {rupiah(s.total_tunai)}</span>
                         <span className="flex items-center gap-1"><QrCode size={12} /> Non-tunai {rupiah(s.total_non_tunai)}</span>
                         <span className="flex items-center gap-1"><NotebookPen size={12} /> Kasbon {rupiah(s.total_kasbon)}</span>
+                        {Number(s.total_refund) > 0 && (
+                          <span className="flex items-center gap-1 text-orange-600"><RotateCcw size={12} /> Refund {rupiah(s.total_refund)}</span>
+                        )}
                         <span className="ml-auto">{s.jumlah_transaksi} transaksi</span>
                       </div>
                       {s.status === 'tutup' && s.catatan && (
@@ -314,6 +321,7 @@ export default function Shift() {
                 <div className="flex justify-between"><span>Kas awal</span><b>{rupiah(aktif.kas_awal)}</b></div>
                 <div className="flex justify-between"><span>Tunai masuk</span><b>{rupiah(aktif.total_tunai)}</b></div>
                 <div className="flex justify-between"><span>Pelunasan kasbon</span><b>{rupiah(aktif.total_pelunasan)}</b></div>
+                <div className="flex justify-between"><span>Refund retur</span><b className="text-orange-600">−{rupiah(aktif.total_refund)}</b></div>
                 <div className="flex justify-between border-t border-slate-200 pt-1"><span>Uang seharusnya</span><b>{rupiah(aktif.uang_seharusnya)}</b></div>
               </div>
 
