@@ -58,6 +58,10 @@ const purchases = await api('GET', '/api/purchases', { token });
 cek('owner purchases 200', purchases.status === 200 && Array.isArray(purchases.data));
 const purchasesRingkasan = await api('GET', '/api/purchases/ringkasan', { token });
 cek('owner purchases/ringkasan 200 + total_hutang', purchasesRingkasan.status === 200 && typeof purchasesRingkasan.data.total_hutang === 'number');
+const shifts = await api('GET', '/api/shifts', { token });
+cek('owner shifts 200', shifts.status === 200 && Array.isArray(shifts.data));
+const shiftAktif = await api('GET', '/api/shifts/aktif', { token });
+cek('owner shifts/aktif 200', shiftAktif.status === 200);
 const produk = await api('GET', '/api/products', { token });
 cek('owner products: modal_beli terlihat', produk.status === 200 && produk.data.length > 0 && produk.data[0].modal_beli != null);
 const sales = await api('GET', '/api/sales?limit=5', { token });
@@ -80,6 +84,8 @@ const kasirDebts = await api('GET', '/api/debts', { token: tokenKasir });
 cek('kasir debts -> 403', kasirDebts.status === 403);
 const kasirPurchases = await api('GET', '/api/purchases', { token: tokenKasir });
 cek('kasir purchases -> 403', kasirPurchases.status === 403);
+const kasirShifts = await api('GET', '/api/shifts', { token: tokenKasir });
+cek('kasir shifts 200 (milik sendiri)', kasirShifts.status === 200 && Array.isArray(kasirShifts.data));
 const kasirProduk = await api('GET', '/api/products', { token: tokenKasir });
 cek('kasir products: modal_beli disensor', kasirProduk.status === 200 && kasirProduk.data.every((p) => p.modal_beli === undefined));
 const kasirSales = await api('GET', '/api/sales?limit=5', { token: tokenKasir });
@@ -97,6 +103,8 @@ const gudangLaporan = await api('GET', '/api/suppliers/laporan', { token: tokenG
 cek('gudang suppliers/laporan: harga disensor', gudangLaporan.status === 200 && gudangLaporan.data.ringkasan.estimasi_nilai_kulakan === undefined);
 const gudangPurchases = await api('GET', '/api/purchases', { token: tokenGudang });
 cek('gudang purchases 200', gudangPurchases.status === 200 && Array.isArray(gudangPurchases.data));
+const gudangShifts = await api('GET', '/api/shifts', { token: tokenGudang });
+cek('gudang shifts -> 403', gudangShifts.status === 403);
 
 // 4. Validasi & 404 (tanpa membuat data)
 const expNol = await api('POST', '/api/expenses', { token, body: { jumlah: 0, kategori: 'Uji' } });
@@ -117,6 +125,10 @@ const bayarKasir = await api('POST', '/api/purchases/00000000-0000-4000-8000-000
 cek('kasir bayar hutang suplier -> 403', bayarKasir.status === 403);
 const bayar404 = await api('POST', '/api/purchases/00000000-0000-4000-8000-000000000000/bayar', { token, body: { jumlah_bayar: 1000 } });
 cek('purchases bayar id tidak ada -> 404', bayar404.status === 404);
+const bukaMinus = await api('POST', '/api/shifts/buka', { token: tokenKasir, body: { kas_awal: -1 } });
+cek('shifts buka kas awal negatif -> 400', bukaMinus.status === 400);
+const tutup404 = await api('POST', '/api/shifts/00000000-0000-4000-8000-000000000000/tutup', { token, body: { kas_fisik: 0 } });
+cek('shifts tutup id tidak ada -> 404', tutup404.status === 404);
 
 // 5. Audit void: struk yang sudah dibatalkan tetap terlihat & tidak bisa divoid 2x
 const audit = await api('GET', '/api/sales?tampilkan_void=1&limit=200', { token });

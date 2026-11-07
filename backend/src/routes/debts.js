@@ -69,11 +69,14 @@ router.post('/:id/bayar', async (req, res) => {
     }
     const sisa = d.sisa_utang - jumlah;
     const status = sisa === 0 ? 'lunas' : d.status;
-    await client.query(`INSERT INTO debt_payments (debt_id, jumlah_bayar, diterima_oleh) VALUES ($1,$2,$3)`, [
-      d.id,
-      jumlah,
-      req.user.id,
-    ]);
+    const { rows: shiftRows } = await client.query(
+      `SELECT id FROM shifts WHERE kasir_id = $1 AND status = 'buka' ORDER BY mulai DESC LIMIT 1`,
+      [req.user.id]
+    );
+    await client.query(
+      `INSERT INTO debt_payments (debt_id, jumlah_bayar, diterima_oleh, shift_id) VALUES ($1,$2,$3,$4)`,
+      [d.id, jumlah, req.user.id, shiftRows[0]?.id || null]
+    );
     const { rows: upd } = await client.query(
       `UPDATE debts SET sisa_utang=$1, status=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
       [sisa, status, d.id]

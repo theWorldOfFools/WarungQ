@@ -84,10 +84,16 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
     const kembalian = dibayar_via === 'tunai' ? diterima - total_masuk : 0;
 
     const kode = kodeStruk();
+    // Tempelkan transaksi ke shift terbuka milik kasir (bila ada).
+    const { rows: shiftRows } = await client.query(
+      `SELECT id FROM shifts WHERE kasir_id = $1 AND status = 'buka' ORDER BY mulai DESC LIMIT 1`,
+      [req.user.id]
+    );
+    const shiftId = shiftRows[0]?.id || null;
     const { rows: srows } = await client.query(
-      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id, referensi_bayar)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id, referensi]
+      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id, referensi_bayar, shift_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id, referensi, shiftId]
     );
     const sale = srows[0];
 

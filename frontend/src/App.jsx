@@ -11,6 +11,7 @@ import PageTransition from './components/PageTransition';
 import Login from './pages/Login';
 import Kasir from './pages/Kasir';
 import Riwayat from './pages/Riwayat';
+import Shift from './pages/Shift';
 import Stok from './pages/Stok';
 import Suplier from './pages/Suplier';
 import Kulakan from './pages/Kulakan';
@@ -96,6 +97,7 @@ function Rute() {
         <Route path="/laporan" element={<Guard boleh={['owner']}><Laporan /></Guard>} />
         <Route path="/kasir" element={<Guard boleh={['owner', 'kasir']}><Kasir /></Guard>} />
         <Route path="/riwayat" element={<Guard boleh={['owner', 'kasir']}><Riwayat /></Guard>} />
+        <Route path="/shift" element={<Guard boleh={['owner', 'kasir']}><Shift /></Guard>} />
         <Route path="/stok" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Stok /></Guard>} />
         <Route path="/suplier" element={<Guard boleh={['owner', 'gudang']}><Suplier /></Guard>} />
         <Route path="/kulakan" element={<Guard boleh={['owner', 'gudang']}><Kulakan /></Guard>} />

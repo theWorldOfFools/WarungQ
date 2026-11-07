@@ -267,7 +267,7 @@ frontend/src/
   pages/*.jsx                # Dompet, Kasir, Riwayat, Stok, Suplier, Kasbon,
                              #   Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (42 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (48 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -286,6 +286,8 @@ docs/
 | `suppliers` + `product_suppliers` + riwayat | multi-suplier per barang + harga beli |
 | `supplier_purchases` + `supplier_purchase_items` | kulakan per suplier: total, dibayar, sisa, jatuh tempo, snapshot barang |
 | `supplier_payments` | cicilan bayar hutang kulakan + pelaku |
+| `shifts` | shift kasir: kas awal, tunai/non-tunai/kasbon, pelunasan, kas fisik, selisih |
+| `sales.shift_id` + `debt_payments.shift_id` | menautkan transaksi & pelunasan ke shift berjalan |
 | `app_settings` | setelan aplikasi di server |
 | `wa_outbox` | (rencana V2.0) antrean pesan WhatsApp + status kirim/retry |
 
@@ -333,6 +335,12 @@ GET  /api/purchases/ringkasan                (owner, gudang)
 GET  /api/purchases/:id                       (detail + barang + riwayat bayar)
 POST /api/purchases {supplier_id, items, jatuh_tempo}   (owner, gudang; stok bertambah)
 POST /api/purchases/:id/bayar {jumlah_bayar}  (owner only; cicilan hutang)
+
+GET  /api/shifts                             (owner: semua, kasir: sendiri)
+GET  /api/shifts/aktif                       (shift terbuka milik pengguna)
+GET  /api/shifts/:id                         (detail + hitungan live)
+POST /api/shifts/buka {kas_awal}             (owner, kasir)
+POST /api/shifts/:id/tutup {kas_fisik,catatan} (owner / pemilik shift; hitung selisih)
 
 GET  /api/debts
 POST /api/debts
@@ -508,7 +516,7 @@ laporan akuntansi berat.
 |---|---|---|---|---|
 | 1 | **Pembayaran non-tunai (QRIS/transfer/e-wallet)** + rekonsiliasi | QRIS sudah lazim di warung/kios; saat ini `sales.dibayar_via` hanya `tunai`/`kasbon`, jadi uang non-tunai tidak tercatat rapi | Tambah metode bayar + bukti + laporan per metode | ✅ Selesai |
 | 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ✅ Selesai |
-| 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ⏳ Rencana |
+| 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ✅ Selesai |
 | 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ⏳ Rencana |
 | 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ⏳ Rencana |
 | 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ⏳ Rencana |
