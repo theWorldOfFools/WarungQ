@@ -155,6 +155,34 @@ const waRekapBuruk = await api('POST', '/api/wa/rekap', { token, body: { tujuan:
 cek('wa rekap nomor tidak valid -> 400', waRekapBuruk.status === 400);
 const waKasbon404 = await api('POST', '/api/wa/kasbon/00000000-0000-4000-8000-000000000000', { token });
 cek('wa tagihan kasbon id tidak ada -> 404', waKasbon404.status === 404);
+const csvPenjualan = await fetch(BASE + '/api/exports/penjualan.csv', {
+  headers: { Authorization: `Bearer ${token}` },
+});
+const teksCsv = await csvPenjualan.text();
+cek(
+  'ekspor penjualan CSV -> 200 + header',
+  csvPenjualan.status === 200 &&
+    (csvPenjualan.headers.get('content-type') || '').includes('text/csv') &&
+    teksCsv.includes('Kode Struk')
+);
+const csvKasir = await fetch(BASE + '/api/exports/barang.csv', {
+  headers: { Authorization: `Bearer ${tokenKasir}` },
+});
+cek('kasir ekspor CSV -> 403', csvKasir.status === 403);
+const backup = await api('GET', '/api/backup', { token });
+cek(
+  'backup owner -> JSON + tabel',
+  backup.status === 200 &&
+    backup.data?.aplikasi === 'WarungQ' &&
+    Array.isArray(backup.data?.tabel?.products)
+);
+const restoreTanpa = await api('POST', '/api/backup/restore', { token, body: { data: {} } });
+cek('restore tanpa konfirmasi -> 400', restoreTanpa.status === 400);
+const restoreAsing = await api('POST', '/api/backup/restore', {
+  token,
+  body: { konfirmasi: 'PULIHKAN', data: { aplikasi: 'WarungQ', tabel: { evil: [] } } },
+});
+cek('restore tabel asing -> 400', restoreAsing.status === 400);
 
 
 // 5. Audit void: struk yang sudah dibatalkan tetap terlihat & tidak bisa divoid 2x

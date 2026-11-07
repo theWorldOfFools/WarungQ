@@ -16,10 +16,12 @@ const purchaseRoutes = require('./routes/purchases');
 const shiftRoutes = require('./routes/shifts');
 const returnRoutes = require('./routes/returns');
 const waRoutes = require('./routes/wa');
+const exportRoutes = require('./routes/exports');
+const backupRoutes = require('./routes/backup');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use(morgan('dev'));
 
 app.get('/health', async (req, res) => {
@@ -43,6 +45,8 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/wa', waRoutes);
+app.use('/api/exports', exportRoutes);
+app.use('/api/backup', backupRoutes);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

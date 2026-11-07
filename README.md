@@ -179,6 +179,9 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 5. **WhatsApp otomatis + rekap terjadwal** — adapter `manual`/`waha`/`cloudapi`,
    tabel `wa_outbox` dengan retry, rekap harian otomatis, kirim tagihan kasbon
    otomatis dengan fallback `wa.me`.
+6. **Ekspor & backup** — rekap harian/detail penjualan/daftar barang ke CSV
+   (Excel), laporan siap cetak PDF lewat browser, backup JSON seluruh data, dan
+   pemulihan atomik dengan konfirmasi `PULIHKAN`.
 
 ### Akun & Peran (RBAC)
 
@@ -194,6 +197,7 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 | Batalkan struk (void) | ✅ | ❌ | ❌ |
 | Kasbon + WA | ✅ | ❌ (buat dari Kasir ✅) | ❌ |
 | WhatsApp otomatis & rekap terjadwal | ✅ | ❌ | ❌ |
+| Ekspor CSV/PDF + backup & restore | ✅ | ❌ | ❌ |
 | Suplier + harga kulakan | ✅ | ❌ disensor | ✅ kelola |
 | Rekomendasi kulakan menipis | ✅ | ❌ | ✅ |
 | Struk thermal 58mm terpisah | ✅ | ✅ | ❌ |
@@ -276,7 +280,7 @@ backend/src/
   config/migrate.js          # runner migrasi SQL
   seed.js                    # owner + 7 produk + 2 suplier demo (idempotent)
   middleware/auth.js         # authRequired + requireRole
-  routes/*.js                # 9 modul API
+  routes/*.js                # 14 modul API
   utils/warung.js            # kode struk, normalisasi WA, draf tagihan, sensor modal
   services/wa.js             # adapter kirim WhatsApp: manual/waha/cloudapi + outbox
   services/waWorker.js       # worker antrean + rekap harian terjadwal
@@ -286,9 +290,10 @@ frontend/src/
   context/*.jsx              # AuthContext, PengaturanContext (localStorage)
   components/*.jsx           # Sidebar, BottomNav, ProductCard, StrukPrint, dll
   pages/*.jsx                # Dompet, Kasir, Riwayat, Stok, Suplier, Kasbon,
-                             #   WhatsApp, Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
+                             #   WhatsApp, Ekspor, LaporanCetak, Pengeluaran, Laporan,
+                             #   Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (61 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (66 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -393,6 +398,13 @@ POST /api/wa/kirim {tujuan,pesan}          (kirim langsung via driver aktif)
 POST /api/wa/rekap {tanggal,tujuan?}       (rekap harian manual)
 POST /api/wa/kasbon/:id                    (tagihan kasbon otomatis)
 POST /api/wa/proses                        (proses ulang antrean)
+
+# Ekspor & backup (owner only)
+GET  /api/exports/laporan.csv?dari=&sampai=   (rekap harian, Excel-compatible)
+GET  /api/exports/penjualan.csv?dari=&sampai= (detail struk)
+GET  /api/exports/barang.csv                  (produk + status stok)
+GET  /api/backup                              (unduh JSON seluruh data)
+POST /api/backup/restore {konfirmasi:"PULIHKAN",data}  (ganti seluruh data, atomik)
 ```
 
 ---
@@ -414,7 +426,7 @@ Pengujian dilakukan 4 lapis — dari bawah (infrastruktur) ke atas (perilaku pen
 # 1) stack hidup
 cp .env.example .env && docker compose up --build -d
 
-# 2) uji API & RBAC (61 skenario)
+# 2) uji API & RBAC (66 skenario)
 node docs/uji-api.mjs
 
 # 3) uji E2E UI + regenerate screenshot (Playwright dipasang di frontend/)
@@ -444,17 +456,18 @@ Chromium 151 headless 1440×900 + 390×844, timezone `Asia/Jakarta`.
 
 | Uji | Perintah | Hasil |
 |---|---|---|
-| API & RBAC | `node docs/uji-api.mjs` | **61 lolos / 0 gagal** |
+| API & RBAC | `node docs/uji-api.mjs` | **66 lolos / 0 gagal** |
 | E2E UI | `node docs/e2e-ui.mjs` | **selesai, 18 screenshot** (tanpa error) |
 
-Cakupan 61 skenario API: health + koneksi DB; login salah sandi (401), email
+Cakupan 66 skenario API: health + koneksi DB; login salah sandi (401), email
 tidak valid (400), tanpa token (401); owner melihat `modal_beli`/`total_modal`
 dan `seri_harian` format `YYYY-MM-DD`; kasir & gudang menerima 403 di
 `reports`, `expenses`, `debts`, `products/:id/movements`, `POST /sales`, dan
 void; sensor `modal_beli`/`total_modal` untuk non-owner; validasi
 `expenses=0`, keranjang kosong, kasbon tanpa nama, debts tanpa nama, produk
 tidak ada (404); audit void (`tampilkan_void=1`, void kedua 400); status &
-antrean WhatsApp, validasi kirim/rekap/pengaturan, serta RBAC kasir (403);
+antrean WhatsApp, validasi kirim/rekap/pengaturan, ekspor CSV, backup JSON,
+validasi restore, serta RBAC kasir (403);
 akun uji dibuat lalu dihapus dan tidak bisa login lagi.
 
 ### Alur end-to-end yang diuji lewat UI
@@ -550,7 +563,7 @@ laporan akuntansi berat.
 | 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ✅ Selesai |
 | 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ✅ Selesai |
 | 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ✅ Selesai |
-| 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ⏳ Rencana |
+| 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ✅ Selesai |
 | 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ⏳ Rencana |
 | 8 | **Multi-outlet + harga grosir/member** | UMKM naik kelas biasanya buka cabang atau punya pelanggan langganan | Isolasi data per outlet, peran, harga bertingkat | ⏳ Rencana |
 
@@ -604,5 +617,9 @@ Cloud API tanpa mengubah logika bisnis.
   belum dilacak lewat webhook (baru status kirim dari API).
 - Void struk penuh tetap tersedia untuk koreksi; retur parsial & barang rusak/expired ada di 8.1 #4.
 - Belum ada multi-toko (rencana 8.1 #8). Hutang ke suplier sudah aktif di 8.1 #2.
+- Ekspor PDF memakai dialog cetak browser (“Save as PDF”), bukan generator PDF
+  di server; isi mengikuti halaman laporan periode.
+- Backup JSON memuat seluruh data termasuk hash sandi — simpan berkas di tempat
+  aman. Restore bersifat mengganti total (bukan merge), hanya untuk owner.
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat
   `docs/e2e-ui.mjs`.

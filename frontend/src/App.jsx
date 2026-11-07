@@ -22,6 +22,8 @@ import Pengeluaran from './pages/Pengeluaran';
 import Laporan from './pages/Laporan';
 import Kasbon from './pages/Kasbon';
 import WhatsApp from './pages/WhatsApp';
+import Ekspor from './pages/Ekspor';
+import LaporanCetak from './pages/LaporanCetak';
 import Pengguna from './pages/Pengguna';
 import Pengaturan from './pages/Pengaturan';
 import { cn } from './components/cn';
@@ -45,6 +47,7 @@ function Kerangka({ children }) {
   // Halaman struk: layout print-only terpisah — tanpa sidebar/header/bottom-nav
   // agar cetak thermal 58mm bersih dari antarmuka aplikasi.
   const diStruk = loc.pathname.startsWith('/struk');
+  const diCetak = loc.pathname.startsWith('/laporan/cetak');
 
   useEffect(() => {
     setRapat(pengaturan.sidebarRapatDefault);
@@ -55,7 +58,7 @@ function Kerangka({ children }) {
     setDrawer(false);
   }, [loc.pathname]);
 
-  if (diLogin || diStruk) return children;
+  if (diLogin || diStruk || diCetak) return children;
 
   return (
     <div className="min-h-screen">
@@ -97,6 +100,7 @@ function Rute() {
         <Route path="/masuk" element={<Login />} />
         <Route path="/dompet" element={<Guard boleh={['owner']}><Dompet /></Guard>} />
         <Route path="/laporan" element={<Guard boleh={['owner']}><Laporan /></Guard>} />
+        <Route path="/laporan/cetak" element={<Guard boleh={['owner']}><LaporanCetak /></Guard>} />
         <Route path="/kasir" element={<Guard boleh={['owner', 'kasir']}><Kasir /></Guard>} />
         <Route path="/riwayat" element={<Guard boleh={['owner', 'kasir']}><Riwayat /></Guard>} />
         <Route path="/shift" element={<Guard boleh={['owner', 'kasir']}><Shift /></Guard>} />
@@ -108,6 +112,7 @@ function Rute() {
         <Route path="/pengeluaran" element={<Guard boleh={['owner']}><Pengeluaran /></Guard>} />
         <Route path="/kasbon" element={<Guard boleh={['owner']}><Kasbon /></Guard>} />
         <Route path="/whatsapp" element={<Guard boleh={['owner']}><WhatsApp /></Guard>} />
+        <Route path="/ekspor" element={<Guard boleh={['owner']}><Ekspor /></Guard>} />
         <Route path="/pengguna" element={<Guard boleh={['owner']}><Pengguna /></Guard>} />
         <Route path="/pengaturan" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Pengaturan /></Guard>} />
         <Route path="/" element={<RuteAwal />} />
