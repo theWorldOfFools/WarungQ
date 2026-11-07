@@ -123,6 +123,8 @@ const debtTanpaNama = await api('POST', '/api/debts', { token, body: { no_wa: '0
 cek('debts tanpa nama -> 400', debtTanpaNama.status === 400);
 const produk404 = await api('GET', '/api/products/00000000-0000-4000-8000-000000000000', { token });
 cek('produk tidak ada -> 404', produk404.status === 404);
+const cidBuruk = await api('POST', '/api/sales', { token, body: { client_id: 'bukan-uuid' } });
+cek('sales client_id tidak valid -> 400', cidBuruk.status === 400);
 const voidKasir = await api('POST', `/api/sales/${sales.data[0].id}/void`, { token: tokenKasir, body: { alasan: 'uji' } });
 cek('kasir void struk -> 403', voidKasir.status === 403);
 const purchaseKosong = await api('POST', '/api/purchases', { token, body: { items: [] } });

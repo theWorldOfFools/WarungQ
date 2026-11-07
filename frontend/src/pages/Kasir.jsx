@@ -1,7 +1,7 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer, ExternalLink, Wallet, NotebookPen, QrCode, ArrowLeftRight, Smartphone } from 'lucide-react';
+import { ShoppingCart, Search, Trash2, Minus, Plus, CheckCircle2, ReceiptText, Printer, ExternalLink, Wallet, NotebookPen, QrCode, ArrowLeftRight, Smartphone, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 // Kamera (html5-qrcode) cukup berat — lazy-load agar bundle awal ringan.
 const BarcodeInput = lazy(() => import('../components/BarcodeInput'));
@@ -14,6 +14,16 @@ import { METODE_BAYAR, labelMetode, nonTunai as isNonTunai } from '../data/metod
 import { Card, PageHeader, EmptyState, Notice, Wadah } from '../components/ui';
 import { usePengaturan } from '../context/PengaturanContext';
 import { cn } from '../components/cn';
+import {
+  simpanProduk,
+  produkCache,
+  waktuCacheProduk,
+  bacaAntrean,
+  tambahAntrean,
+  hapusAntrean,
+  tandaiGagal,
+  tandaiAntri,
+} from '../utils/offline';
 
 const IKON_METODE = {
   tunai: Wallet,
@@ -38,21 +48,89 @@ export default function Kasir() {
   const [strukTerakhir, setStrukTerakhir] = useState(null);
   const [kategori, setKategori] = useState('Semua');
   const [konfirm, setKonfirm] = useState(null); // {mode:'kosongkan'} | {mode:'hapus', item}
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine);
+  const [antrean, setAntrean] = useState([]);
+  const [sinkronProses, setSinkronProses] = useState(false);
+  const sinkronRef = useRef(false);
 
   async function muat(q = cari) {
     setMemuat(true);
     try {
       const { data } = await api.get('/api/products', { params: { q } });
       setProduk(data);
+      if (!q) simpanProduk(data);
+      setOffline(false);
     } catch {
-      setGagal('Gagal memuat barang. Coba lagi ya.');
+      const kata = String(q || '').toLowerCase();
+      const cache = produkCache();
+      const hasil = kata
+        ? cache.filter(
+            (p) =>
+              String(p.nama || '').toLowerCase().includes(kata) ||
+              String(p.barcode || '').includes(kata)
+          )
+        : cache;
+      if (hasil.length) {
+        setProduk(hasil);
+        setOffline(true);
+        setGagal('');
+      } else {
+        setGagal('Gagal memuat barang. Coba lagi ya.');
+      }
     } finally {
       setMemuat(false);
     }
   }
 
+  async function sinkron() {
+    if (sinkronRef.current) return;
+    const antri = bacaAntrean().filter((x) => x.status === 'antri');
+    if (!antri.length) return;
+    sinkronRef.current = true;
+    setSinkronProses(true);
+    let berhasil = 0;
+    for (const item of antri) {
+      try {
+        await api.post('/api/sales', item.payload);
+        hapusAntrean(item.client_id);
+        berhasil += 1;
+      } catch (e) {
+        if (!e.response) break;
+        tandaiGagal(item.client_id, e.response.data?.pesan || 'Ditolak server.');
+      }
+    }
+    setAntrean(bacaAntrean());
+    sinkronRef.current = false;
+    setSinkronProses(false);
+    if (berhasil) {
+      setPesan(`${berhasil} transaksi offline berhasil disinkronkan.`);
+      setGagal('');
+      muat('');
+    }
+  }
+
   useEffect(() => {
     muat('');
+    setAntrean(bacaAntrean());
+    function online() {
+      setOffline(false);
+      sinkron();
+    }
+    function offlineMode() {
+      setOffline(true);
+      setPesan('Koneksi putus — kasir tetap jalan, transaksi disimpan di perangkat.');
+    }
+    function antreanBerubah() {
+      setAntrean(bacaAntrean());
+    }
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offlineMode);
+    window.addEventListener('wq-antrean', antreanBerubah);
+    return () => {
+      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offlineMode);
+      window.removeEventListener('wq-antrean', antreanBerubah);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -87,7 +165,13 @@ export default function Kasir() {
       tambah(pas);
       setPesan(`"${pas.nama}" masuk keranjang.`);
     } catch {
-      setGagal('Gagal mencari barang.');
+      const pas = produkCache().find((d) => String(d.barcode || '') === String(kode));
+      if (pas) {
+        tambah(pas);
+        setPesan(`"${pas.nama}" masuk keranjang (mode offline).`);
+      } else {
+        setGagal('Gagal mencari barang.');
+      }
     }
   }
 
@@ -122,27 +206,55 @@ export default function Kasir() {
     setKonfirm(null);
   }
 
+  function bersihkanKeranjang() {
+    setKeranjang([]);
+    setDiterima(0);
+    setReferensi('');
+    if (bayarVia === 'kasbon') setKasbonForm({ nama_tetangga: '', no_wa: '', jatuh_tempo: '' });
+  }
+
+  function simpanOffline(payload) {
+    const item = tambahAntrean(payload, {
+      total,
+      jumlah_item: jumlahItem,
+      metode: bayarVia,
+      kasbon_nama: bayarVia === 'kasbon' ? kasbonForm.nama_tetangga : '',
+    });
+    setAntrean(bacaAntrean());
+    setPesan(
+      `Koneksi putus — transaksi ${item.kode_lokal} disimpan di perangkat dan dikirim otomatis saat online.`
+    );
+    setGagal('');
+    bersihkanKeranjang();
+    return item;
+  }
+
   async function bayar() {
     setPesan('');
     setGagal('');
     const pakaiKasbon = bayarVia === 'kasbon';
     const pakaiNonTunai = isNonTunai(bayarVia);
+    const payload = {
+      items: keranjang.map((k) => ({ id: k.id, qty: k.qty })),
+      uang_diterima: bayarVia === 'tunai' ? diterima : pakaiNonTunai ? total : 0,
+      dibayar_via: bayarVia,
+      referensi_bayar: pakaiNonTunai ? referensi : '',
+      ...(pakaiKasbon
+        ? {
+            kasbon: {
+              nama_tetangga: kasbonForm.nama_tetangga,
+              no_wa: kasbonForm.no_wa,
+              jatuh_tempo: kasbonForm.jatuh_tempo || null,
+            },
+          }
+        : {}),
+    };
+    if (!navigator.onLine) {
+      simpanOffline(payload);
+      return;
+    }
     try {
-      const { data } = await api.post('/api/sales', {
-        items: keranjang.map((k) => ({ id: k.id, qty: k.qty })),
-        uang_diterima: bayarVia === 'tunai' ? diterima : pakaiNonTunai ? total : 0,
-        dibayar_via: bayarVia,
-        referensi_bayar: pakaiNonTunai ? referensi : '',
-        ...(pakaiKasbon
-          ? {
-              kasbon: {
-                nama_tetangga: kasbonForm.nama_tetangga,
-                no_wa: kasbonForm.no_wa,
-                jatuh_tempo: kasbonForm.jatuh_tempo || null,
-              },
-            }
-          : {}),
-      });
+      const { data } = await api.post('/api/sales', payload);
       setPesan(data.pesan || 'Jualan tersimpan!');
       setStrukTerakhir({
         saleId: data.id || null,
@@ -156,12 +268,13 @@ export default function Kasir() {
         kasbon_nama: pakaiKasbon ? kasbonForm.nama_tetangga : null,
         tanggal: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
       });
-      setKeranjang([]);
-      setDiterima(0);
-      setReferensi('');
-      if (pakaiKasbon) setKasbonForm({ nama_tetangga: '', no_wa: '', jatuh_tempo: '' });
+      bersihkanKeranjang();
       muat('');
     } catch (e) {
+      if (!e.response) {
+        simpanOffline(payload);
+        return;
+      }
       setGagal(e.response?.data?.pesan || 'Gagal menyimpan. Cek stok & uang diterima ya.');
     }
   }
@@ -194,6 +307,67 @@ export default function Kasir() {
 
       <Notice tone="success">{pesan}</Notice>
       {gagal && <Notice tone="error">{gagal}</Notice>}
+
+      {(offline || antrean.length > 0) && (
+        <Card className={cn('space-y-2', antrean.some((a) => a.status === 'gagal') ? 'border-rose-200' : 'border-amber-200')}>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-extrabold flex items-center gap-2 text-sm">
+              {offline ? <WifiOff size={17} className="text-amber-600" /> : <RefreshCw size={17} className="text-amber-600" />}
+              {offline ? 'Mode offline — transaksi disimpan di perangkat' : 'Antrean transaksi offline'}
+            </h2>
+            <span className="badge bg-amber-50 text-amber-800 border border-amber-200">{antrean.length} antre</span>
+            {!offline && antrean.some((a) => a.status === 'antri') && (
+              <button
+                onClick={sinkron}
+                disabled={sinkronProses}
+                className="btn-lembut ml-auto py-1.5 px-3 text-xs disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={sinkronProses ? 'animate-spin' : ''} /> Sinkronkan
+              </button>
+            )}
+          </div>
+          {offline && (
+            <p className="text-xs text-slate-500">
+              Katalog terakhir: {waktuCacheProduk() ? new Date(waktuCacheProduk()).toLocaleString('id-ID') : 'belum tersimpan'}.
+              Stok & harga mengikuti cache; transaksi dikirim saat koneksi pulih.
+            </p>
+          )}
+          {antrean.length > 0 && (
+            <div className="space-y-1.5">
+              {antrean.map((a) => (
+                <div key={a.client_id} className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2.5 py-1.5 text-xs">
+                  <b className="font-mono">{a.kode_lokal}</b>
+                  <span className="text-slate-500">{a.meta?.jumlah_item || 0} item • {rupiah(a.meta?.total || 0)}</span>
+                  {a.meta?.metode && <span className="badge bg-slate-100 text-slate-600 border-slate-200">{labelMetode(a.meta.metode)}</span>}
+                  {a.status === 'gagal' ? (
+                    <span className="text-rose-600 font-semibold flex items-center gap-1">
+                      <AlertTriangle size={12} /> {a.error || 'Ditolak server'}
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 font-semibold">menunggu koneksi</span>
+                  )}
+                  <div className="ml-auto flex gap-1">
+                    {a.status === 'gagal' && (
+                      <button
+                        onClick={() => { tandaiAntri(a.client_id); sinkron(); }}
+                        className="rounded-lg px-2 py-1 font-bold text-emerald-700 hover:bg-emerald-50"
+                      >
+                        Coba lagi
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { hapusAntrean(a.client_id); setAntrean(bacaAntrean()); }}
+                      className="rounded-lg px-2 py-1 font-bold text-rose-600 hover:bg-rose-50"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-4 items-start">
         {/* Kiri: scan + grid produk */}

@@ -8,6 +8,17 @@ router.use(authRequired);
 
 const METODE_BAYAR = ['tunai', 'kasbon', 'qris', 'transfer', 'ewallet'];
 const METODE_NON_TUNAI = ['qris', 'transfer', 'ewallet'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function balasSale(req, res, sale, tambahan = {}) {
+  const data = { ...sale, ...tambahan };
+  if (req.user.role !== 'owner') {
+    const { total_modal: _m, perkiraan_untung: _u, ...aman } = data;
+    return res.status(200).json(aman);
+  }
+  return res.status(200).json(data);
+}
+
 const LABEL_METODE = {
   tunai: 'Tunai',
   qris: 'QRIS',
@@ -28,7 +39,22 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
     dibayar_via = 'tunai',
     kasbon = null,
     referensi_bayar = '',
+    client_id = null,
   } = req.body;
+  let cid = null;
+  if (client_id !== null && client_id !== undefined && client_id !== '') {
+    cid = String(client_id);
+    if (!UUID_RE.test(cid)) return res.status(400).json({ pesan: 'client_id tidak valid.' });
+    const { rows: sudah } = await pool.query('SELECT * FROM sales WHERE client_id = $1', [cid]);
+    if (sudah[0]) {
+      const { rows: utang } = await pool.query('SELECT id FROM debts WHERE sale_id = $1', [sudah[0].id]);
+      return balasSale(req, res, sudah[0], {
+        kasbon_id: utang[0]?.id || null,
+        duplikat: true,
+        pesan: 'Transaksi ini sudah tersimpan sebelumnya.',
+      });
+    }
+  }
   if (!Array.isArray(items) || items.length === 0)
     return res.status(400).json({ pesan: 'Keranjang masih kosong.' });
   if (!METODE_BAYAR.includes(dibayar_via))
@@ -91,9 +117,9 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
     );
     const shiftId = shiftRows[0]?.id || null;
     const { rows: srows } = await client.query(
-      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id, referensi_bayar, shift_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id, referensi, shiftId]
+      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id, referensi_bayar, shift_id, client_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id, referensi, shiftId, cid]
     );
     const sale = srows[0];
 
@@ -138,6 +164,17 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
     res.status(201).json({ ...sale, kasbon_id: utang?.id || null, pesan: pesanSukses });
   } catch (e) {
     await client.query('ROLLBACK');
+    if (cid && e.code === '23505') {
+      const { rows: sudah } = await pool.query('SELECT * FROM sales WHERE client_id = $1', [cid]);
+      if (sudah[0]) {
+        const { rows: utang } = await pool.query('SELECT id FROM debts WHERE sale_id = $1', [sudah[0].id]);
+        return balasSale(req, res, sudah[0], {
+          kasbon_id: utang[0]?.id || null,
+          duplikat: true,
+          pesan: 'Transaksi ini sudah tersimpan sebelumnya.',
+        });
+      }
+    }
     return res.status(400).json({ pesan: e.message });
   } finally {
     client.release();

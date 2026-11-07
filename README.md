@@ -182,6 +182,9 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 6. **Ekspor & backup** — rekap harian/detail penjualan/daftar barang ke CSV
    (Excel), laporan siap cetak PDF lewat browser, backup JSON seluruh data, dan
    pemulihan atomik dengan konfirmasi `PULIHKAN`.
+7. **Kasir offline-first** — katalog terakhir tersimpan di perangkat, transaksi
+   saat koneksi putus masuk antrean lokal, lalu disinkronkan otomatis dengan
+   `client_id` idempoten agar tidak ada struk ganda.
 
 ### Akun & Peran (RBAC)
 
@@ -198,6 +201,7 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 | Kasbon + WA | ✅ | ❌ (buat dari Kasir ✅) | ❌ |
 | WhatsApp otomatis & rekap terjadwal | ✅ | ❌ | ❌ |
 | Ekspor CSV/PDF + backup & restore | ✅ | ❌ | ❌ |
+| Kasir saat offline (antrean lokal) | ✅ | ✅ | ❌ |
 | Suplier + harga kulakan | ✅ | ❌ disensor | ✅ kelola |
 | Rekomendasi kulakan menipis | ✅ | ❌ | ✅ |
 | Struk thermal 58mm terpisah | ✅ | ✅ | ❌ |
@@ -284,6 +288,7 @@ backend/src/
   utils/warung.js            # kode struk, normalisasi WA, draf tagihan, sensor modal
   services/wa.js             # adapter kirim WhatsApp: manual/waha/cloudapi + outbox
   services/waWorker.js       # worker antrean + rekap harian terjadwal
+  utils/offline.js (frontend) # cache katalog + antrean transaksi localStorage
 frontend/src/
   App.jsx                    # routing + kerangka layout
   api/client.js              # axios instance + helper rupiah
@@ -293,7 +298,7 @@ frontend/src/
                              #   WhatsApp, Ekspor, LaporanCetak, Pengeluaran, Laporan,
                              #   Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (66 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (67 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -305,7 +310,7 @@ docs/
 | `users` | akun + `role` (`owner`/`kasir`/`gudang`) + `aktif` |
 | `products` | barcode unik, `harga_jual`, `modal_beli`, `stok`, `batas_menipis`, `kategori` |
 | `stock_movements` | audit stok: `masuk`/`jual`/`opname`/`keluar` + sisa + pelaku |
-| `sales` | 1 struk: total masuk/modal, `perkiraan_untung` (generated), kembalian, `dibayar_via`, `voided_at` |
+| `sales` | 1 struk: total masuk/modal, `perkiraan_untung` (generated), kembalian, `dibayar_via`, `voided_at`, `client_id` unik untuk retry offline |
 | `sale_items` | snapshot nama/harga/modal per item — rekap tetap benar walau harga berubah |
 | `debts` + `debt_payments` | utang tetangga + cicilan, `sale_id` menautkan ke struk asal |
 | `expenses` | pengeluaran warung per kategori/tanggal |
@@ -347,7 +352,7 @@ PUT  /api/products/:id                    (owner, gudang; harga/modal hanya owne
 GET  /api/products/:id/movements?tipe=&from=&to=&limit=   (owner, gudang)
 POST /api/products/:id/masuk {jumlah}     (owner, gudang)
 
-POST /api/sales {items, uang_diterima|dibayar_via:"kasbon", kasbon:{...}}  (owner, kasir)
+POST /api/sales {items, uang_diterima|dibayar_via:"kasbon", kasbon:{...}, client_id?}  (owner, kasir; client_id = retry idempoten)
 GET  /api/sales?hari=|dari=&sampai=&q=&dibayar_via=&tampilkan_void=&limit=&offset=
 GET  /api/sales/:id                       (detail struk; kasir tanpa modal)
 POST /api/sales/:id/void {alasan}         (owner only)
@@ -426,7 +431,7 @@ Pengujian dilakukan 4 lapis — dari bawah (infrastruktur) ke atas (perilaku pen
 # 1) stack hidup
 cp .env.example .env && docker compose up --build -d
 
-# 2) uji API & RBAC (66 skenario)
+# 2) uji API & RBAC (67 skenario)
 node docs/uji-api.mjs
 
 # 3) uji E2E UI + regenerate screenshot (Playwright dipasang di frontend/)
@@ -456,10 +461,10 @@ Chromium 151 headless 1440×900 + 390×844, timezone `Asia/Jakarta`.
 
 | Uji | Perintah | Hasil |
 |---|---|---|
-| API & RBAC | `node docs/uji-api.mjs` | **66 lolos / 0 gagal** |
+| API & RBAC | `node docs/uji-api.mjs` | **67 lolos / 0 gagal** |
 | E2E UI | `node docs/e2e-ui.mjs` | **selesai, 18 screenshot** (tanpa error) |
 
-Cakupan 66 skenario API: health + koneksi DB; login salah sandi (401), email
+Cakupan 67 skenario API: health + koneksi DB; login salah sandi (401), email
 tidak valid (400), tanpa token (401); owner melihat `modal_beli`/`total_modal`
 dan `seri_harian` format `YYYY-MM-DD`; kasir & gudang menerima 403 di
 `reports`, `expenses`, `debts`, `products/:id/movements`, `POST /sales`, dan
@@ -467,6 +472,7 @@ void; sensor `modal_beli`/`total_modal` untuk non-owner; validasi
 `expenses=0`, keranjang kosong, kasbon tanpa nama, debts tanpa nama, produk
 tidak ada (404); audit void (`tampilkan_void=1`, void kedua 400); status &
 antrean WhatsApp, validasi kirim/rekap/pengaturan, ekspor CSV, backup JSON,
+validasi `client_id` idempotensi offline,
 validasi restore, serta RBAC kasir (403);
 akun uji dibuat lalu dihapus dan tidak bisa login lagi.
 
@@ -564,7 +570,7 @@ laporan akuntansi berat.
 | 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ✅ Selesai |
 | 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ✅ Selesai |
 | 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ✅ Selesai |
-| 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ⏳ Rencana |
+| 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ✅ Selesai |
 | 8 | **Multi-outlet + harga grosir/member** | UMKM naik kelas biasanya buka cabang atau punya pelanggan langganan | Isolasi data per outlet, peran, harga bertingkat | ⏳ Rencana |
 
 Catatan urutan: 1–4 menyentuh uang harian dan layak dikerjakan lebih dulu;
@@ -611,7 +617,7 @@ Cloud API tanpa mengubah logika bisnis.
 
 ### 8.3 Batasan saat ini
 
-- Bundle frontend ~1.07MB (html5-qrcode) — kandidat code-split/lazy load lanjutan
+- Bundle frontend ~1.11MB (html5-qrcode) — kandidat code-split/lazy load lanjutan
   (kamera sudah lazy-load).
 - WhatsApp otomatis bergantung pada WAHA yang ter-pairing; status *delivered/read*
   belum dilacak lewat webhook (baru status kirim dari API).
@@ -619,6 +625,10 @@ Cloud API tanpa mengubah logika bisnis.
 - Belum ada multi-toko (rencana 8.1 #8). Hutang ke suplier sudah aktif di 8.1 #2.
 - Ekspor PDF memakai dialog cetak browser (“Save as PDF”), bukan generator PDF
   di server; isi mengikuti halaman laporan periode.
+- Antrean offline disimpan di `localStorage` perangkat/browser, jadi tidak
+  tersinkron antar perangkat. Stok dicek ulang di server saat sinkron; bila stok
+  sudah berubah, transaksi ditandai gagal dan bisa dicoba/dihapus dari Kasir.
+  Struk offline baru bisa dicetak dari Riwayat setelah sinkron berhasil.
 - Backup JSON memuat seluruh data termasuk hash sandi — simpan berkas di tempat
   aman. Restore bersifat mengganti total (bukan merge), hanya untuk owner.
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat
