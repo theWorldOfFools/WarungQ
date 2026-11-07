@@ -23,6 +23,7 @@ import {
   hapusAntrean,
   tandaiGagal,
   tandaiAntri,
+  clientIdBaru,
 } from '../utils/offline';
 
 const IKON_METODE = {
@@ -51,6 +52,7 @@ export default function Kasir() {
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine);
   const [antrean, setAntrean] = useState([]);
   const [sinkronProses, setSinkronProses] = useState(false);
+  const [memproses, setMemproses] = useState(false);
   const sinkronRef = useRef(false);
 
   async function muat(q = cari) {
@@ -235,6 +237,7 @@ export default function Kasir() {
     const pakaiKasbon = bayarVia === 'kasbon';
     const pakaiNonTunai = isNonTunai(bayarVia);
     const payload = {
+      client_id: clientIdBaru(),
       items: keranjang.map((k) => ({ id: k.id, qty: k.qty })),
       uang_diterima: bayarVia === 'tunai' ? diterima : pakaiNonTunai ? total : 0,
       dibayar_via: bayarVia,
@@ -253,6 +256,7 @@ export default function Kasir() {
       simpanOffline(payload);
       return;
     }
+    setMemproses(true);
     try {
       const { data } = await api.post('/api/sales', payload);
       setPesan(data.pesan || 'Jualan tersimpan!');
@@ -276,6 +280,8 @@ export default function Kasir() {
         return;
       }
       setGagal(e.response?.data?.pesan || 'Gagal menyimpan. Cek stok & uang diterima ya.');
+    } finally {
+      setMemproses(false);
     }
   }
 
@@ -580,7 +586,7 @@ export default function Kasir() {
                     : 'bg-slate-300'
                 )}
                 onClick={bayar}
-                disabled={!bisaBayar}
+                disabled={!bisaBayar || memproses}
               >
                 {bayarVia === 'kasbon' ? (
                   <><NotebookPen size={19} /> Simpan Kasbon {rupiah(total)}</>

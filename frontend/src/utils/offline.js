@@ -40,16 +40,18 @@ export function bacaAntrean() {
   return Array.isArray(isi) ? isi : [];
 }
 
+export function clientIdBaru() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function tambahAntrean(payload, meta = {}) {
   const daftar = bacaAntrean();
-  const clientId =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
+  const clientId = payload.client_id || clientIdBaru();
   const item = {
     client_id: clientId,
     kode_lokal: `OFF-${Date.now().toString().slice(-8)}`,
@@ -57,7 +59,7 @@ export function tambahAntrean(payload, meta = {}) {
     status: 'antri',
     error: '',
     meta,
-    payload: { ...payload, client_id: clientId },
+    payload: payload.client_id ? payload : { ...payload, client_id: clientId },
   };
   tulis(KUNCI_ANTREAN, [...daftar, item]);
   kabarkan();
