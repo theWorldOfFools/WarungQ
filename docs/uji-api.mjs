@@ -44,8 +44,10 @@ cek('tanpa token -> 401', tanpaToken.status === 401);
 // 2. Owner: endpoint baca utama
 const harian = await api('GET', '/api/reports/harian', { token });
 cek('owner reports/harian 200 + field uang_masuk', harian.status === 200 && typeof harian.data.uang_masuk === 'number');
+cek('owner reports/harian: non-tunai + rekonsiliasi', typeof harian.data.uang_masuk_non_tunai === 'number' && Array.isArray(harian.data.per_metode_bayar));
 const rentang = await api('GET', '/api/reports/rentang', { token });
 cek('owner reports/rentang 200 + seri_harian', rentang.status === 200 && Array.isArray(rentang.data.seri_harian) && /^\d{4}-\d{2}-\d{2}$/.test(rentang.data.seri_harian[0].tanggal));
+cek('owner reports/rentang: non-tunai + rekonsiliasi', typeof rentang.data.uang_masuk_non_tunai === 'number' && Array.isArray(rentang.data.per_metode_bayar));
 const expenses = await api('GET', '/api/expenses', { token });
 cek('owner expenses 200', expenses.status === 200 && Array.isArray(expenses.data.pengeluaran));
 const debts = await api('GET', '/api/debts', { token });

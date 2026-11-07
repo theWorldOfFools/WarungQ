@@ -4,6 +4,7 @@ import { Printer, ArrowLeft, Loader2, Ban } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import StrukPrint from '../components/StrukPrint';
 import { usePengaturan } from '../context/PengaturanContext';
+import { labelMetode, nonTunai } from '../data/metodeBayar';
 
 /**
  * Halaman struk terpisah (/struk/:id) — layout print-only 58mm.
@@ -38,6 +39,7 @@ export default function StrukPage() {
           kode: data.kode_struk,
           nama_toko: data.nama_toko,
           dibayar_via: data.dibayar_via,
+          referensi: data.referensi_bayar,
           kasbon_nama: data.kasbon_nama,
           voided_at: data.voided_at,
           alasan_void: data.alasan_void,
@@ -123,12 +125,20 @@ export default function StrukPage() {
                   <span>Bayar</span>
                   <span>KASBON{data?.kasbon_nama ? ` — ${data.kasbon_nama}` : ''}</span>
                 </div>
+              ) : nonTunai(data?.dibayar_via) ? (
+                <div className="flex justify-between font-extrabold text-sky-700">
+                  <span>Bayar</span>
+                  <span>{labelMetode(data?.dibayar_via)}</span>
+                </div>
               ) : (
                 <>
                   <div className="flex justify-between"><span>Diterima</span><span>{rupiah(data?.diterima)}</span></div>
                   <div className="flex justify-between font-extrabold text-emerald-700"><span>Kembali</span><span>{rupiah(data?.kembalian)}</span></div>
                 </>
               )}
+              {data?.referensi ? (
+                <div className="flex justify-between text-xs text-slate-500"><span>Ref</span><span>{data.referensi}</span></div>
+              ) : null}
               {data?.voided_at && (
                 <p className="mt-2 text-center font-extrabold text-rose-600">*** STRUK DIBATALKAN ***</p>
               )}

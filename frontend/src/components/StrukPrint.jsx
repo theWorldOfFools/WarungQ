@@ -1,4 +1,5 @@
 import { rupiah } from '../api/client';
+import { labelMetode, nonTunai } from '../data/metodeBayar';
 
 function garis() {
   return (
@@ -75,6 +76,23 @@ export default function StrukPrint({ data, namaToko, header, footer }) {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Atas nama</span>
                 <span>{data.kasbon_nama}</span>
+              </div>
+            ) : null}
+          </>
+        ) : nonTunai(data.dibayar_via) ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+              <span>Bayar</span>
+              <span>{labelMetode(data.dibayar_via)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Diterima</span>
+              <span>{rupiah(data.diterima)}</span>
+            </div>
+            {data.referensi ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt' }}>
+                <span>Ref</span>
+                <span>{data.referensi}</span>
               </div>
             ) : null}
           </>

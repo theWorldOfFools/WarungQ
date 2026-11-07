@@ -1,4 +1,4 @@
-# 🏪 UMKM-Scan V2 — Kasir Warung Gampang
+# 🏪 UMKM-Scan — Kasir Warung Gampang
 
 Aplikasi manajemen warung untuk 1–100 orang. Bahasa warung sehari-hari:
 **Modal Beli** (bukan HPP), **Uang Masuk** (bukan Pendapatan),
@@ -19,7 +19,7 @@ bukan di browser — jadi angka tidak bisa "diakali" dari sisi klien.
 5. [API Ringkas](#5-api-ringkas)
 6. [Metode Testing](#6-metode-testing)
 7. [Laporan E2E + Screenshot](#7-laporan-e2e--screenshot)
-8. [Batasan & Rencana V3](#8-batasan--rencana-v3)
+8. [Rencana V2.0 & Batasan](#8-rencana-v20--batasan)
 
 ---
 
@@ -73,6 +73,11 @@ Semua nilai punya default, jadi `.env` boleh dikosongkan saat awal.
 > dengan URL publik tunnel lalu `docker compose up --build` ulang — nginx juga
 > sudah mem-proxy `/api/` ke backend di origin yang sama agar bebas mixed-content.
 
+> **Rencana V2.0 (belum aktif):** integrasi WhatsApp otomatis akan memakai
+> WAHA self-hosted. Variabel `WA_DRIVER`, `WAHA_URL`, `WAHA_API_KEY`, dan
+> `WAHA_SESSION` didokumentasikan di
+> [bagian 8.2](#82-keputusan-whatsapp-waha-self-hosted).
+
 ### Dev tanpa Docker
 
 ```bash
@@ -115,7 +120,10 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 
 ## 2. Fitur
 
-### V1 — fondasi warung
+> Penomoran: fitur yang sudah berjalan saat ini adalah **rilis 1.x**. Rencana
+> rilis besar berikutnya ada di [bagian 8](#8-rencana-v20--batasan).
+
+### Rilis 1.0 — fondasi warung
 
 1. **Stok + warna**: 🟢 Aman / 🟡 Menipis (≤ batas) / 🔴 Habis. Form tambah/ubah,
    tombol Barang Masuk (+1), opname lewat ubah stok, dan rekomendasi kulakan.
@@ -133,7 +141,7 @@ docker compose up -d --build frontend backend   # rebuild setelah ubah kode
 5. **Kasbon Tetangga**: catat utang + cicilan + tombol **Ingatkan via WA** →
    draf sopan otomatis ke `wa.me/62xxx`. Nomor `08xx` dinormalisasi ke `62xx`.
 
-### V2 — koreksi & rekap
+### Rilis 1.1 — koreksi & rekap
 
 6. **Riwayat Transaksi**: filter rentang tanggal, cari kode struk, filter
    tunai/kasbon, cetak ulang ke `/struk/:id`, halaman `/riwayat`.
@@ -194,6 +202,7 @@ Tier-1 Solo Fighter = 1 akun Owner yang login. Tambah kasir/gudang di menu **Ora
 | Migrasi | runner SQL sendiri (`backend/src/config/migrate.js`) + `db/migrations/*.sql` | tanpa ORM, urutan & riwayat tercatat di tabel `_migrations` |
 | Infra | Docker Compose + nginx | satu perintah jalan, proxy `/api` satu origin |
 | PWA | manifest + service worker (`frontend/src/pwa.js`) | pasang di HP, cache aset |
+| WhatsApp | WAHA self-hosted + adapter driver `manual`/`waha`/`cloudapi` **(rencana V2.0)** | gratis & tanpa limit pesan, REST + webhook, mudah dikustom; opsi resmi disiapkan menyusul |
 | Testing | Node fetch (`docs/uji-api.mjs`) + Playwright (`docs/e2e-ui.mjs`) | tanpa framework berat, reproducible |
 
 ---
@@ -249,6 +258,7 @@ backend/src/
   middleware/auth.js         # authRequired + requireRole
   routes/*.js                # 8 modul API
   utils/warung.js            # kode struk, normalisasi WA, draf tagihan, sensor modal
+  services/wa/*              # (rencana V2.0) adapter WhatsApp: manual/waha/cloudapi
 frontend/src/
   App.jsx                    # routing + kerangka layout
   api/client.js              # axios instance + helper rupiah
@@ -275,6 +285,7 @@ docs/
 | `expenses` | pengeluaran warung per kategori/tanggal |
 | `suppliers` + `product_suppliers` + riwayat | multi-suplier per barang + harga beli |
 | `app_settings` | setelan aplikasi di server |
+| `wa_outbox` | (rencana V2.0) antrean pesan WhatsApp + status kirim/retry |
 
 ### Keputusan desain yang dijaga
 
@@ -330,6 +341,12 @@ POST /api/suppliers/oleh-produk/:productId {supplier_id, harga_beli}
 DELETE /api/suppliers/oleh-produk/:productId/:linkId
 
 GET/POST/PUT/DELETE /api/users            (owner only; hapus akun sendiri ditolak)
+
+# Rencana V2.0 (belum aktif)
+POST /api/wa/kirim {nomor, pesan}         (driver aktif: manual/waha/cloudapi)
+GET  /api/wa/status                       (status sesi WAHA)
+GET  /api/wa/qr                           (QR pairing sesi WAHA)
+POST /api/wa/webhook                      (callback delivered/read/opt-out)
 ```
 
 ---
@@ -471,12 +488,65 @@ diperbaiki serta diverifikasi ulang lewat screenshot.
 
 ---
 
-## 8. Batasan & Rencana V3
+## 8. Rencana V2.0 & Batasan
+
+### 8.1 Rencana V2.0
+
+Fokus rilis 2.0 adalah menutup celah operasional harian UMKM Indonesia —
+terutama uang, kulakan, dan kepercayaan antar-orang di warung — bukan menambah
+laporan akuntansi berat.
+
+| # | Fitur | Kenapa relevan untuk UMKM Indonesia | Dampak teknis | Status |
+|---|---|---|---|---|
+| 1 | **Pembayaran non-tunai (QRIS/transfer/e-wallet)** + rekonsiliasi | QRIS sudah lazim di warung/kios; saat ini `sales.dibayar_via` hanya `tunai`/`kasbon`, jadi uang non-tunai tidak tercatat rapi | Tambah metode bayar + bukti + laporan per metode | ✅ Selesai |
+| 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ⏳ Rencana |
+| 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ⏳ Rencana |
+| 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ⏳ Rencana |
+| 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ⏳ Rencana |
+| 6 | **Ekspor laporan Excel/PDF + backup/restore** | Kebutuhan pembukuan/pengajuan modal (KUR) dan rasa aman data | Endpoint ekspor + unduh backup | ⏳ Rencana |
+| 7 | **Mode offline-first untuk kasir** | Internet warung sering putus; transaksi tidak boleh gagal | Antrean lokal + sinkronisasi; risiko arsitektur besar | ⏳ Rencana |
+| 8 | **Multi-outlet + harga grosir/member** | UMKM naik kelas biasanya buka cabang atau punya pelanggan langganan | Isolasi data per outlet, peran, harga bertingkat | ⏳ Rencana |
+
+Catatan urutan: 1–4 menyentuh uang harian dan layak dikerjakan lebih dulu;
+7–8 paling berisiko sehingga tidak dijejalkan di awal rilis.
+
+### 8.2 Keputusan WhatsApp: WAHA self-hosted
+
+Kebutuhan: **tanpa limit pesan** dan **bisa dikustom** ke depan. Karena itu
+default yang dipilih adalah **WAHA (WhatsApp HTTP API) self-hosted**, bukan
+gateway kredit lokal atau Cloud API resmi.
+
+| Opsi | Limit/biaya | Kustom | Catatan |
+|---|---|---|---|
+| **WAHA self-hosted** (dipilih) | Gratis & tanpa limit pesan sejak rilis 2026.6.1 | Tinggi — REST + webhook, pilihan engine (NOWEB/GOWS/WEBJS/WPP) | Tidak resmi → nomor berisiko dibatasi/ban |
+| Evolution API | Gratis (mode Baileys); mode Cloud API ikut biaya Meta | Tinggi, bisa Cloud API + integrasi n8n/Chatwoot | Stack berat (Postgres+Redis), sejak 2.4.0 butuh aktivasi lisensi |
+| Meta Cloud API (resmi) | Berbayar per pesan (+62: ±Rp356 utility/service, ±Rp586 marketing) | Terikat kebijakan & template Meta | Paling aman/patuh, tidak "tanpa limit" |
+| Fonnte/WABLAS | Kredit/langganan + limit | Rendah | Tidak sesuai kebutuhan |
+
+Rancangan integrasi:
+
+- `backend/src/services/wa/index.js` — pilih driver dari `WA_DRIVER`:
+  `manual` (perilaku sekarang, tautan `wa.me`), `waha`, atau `cloudapi`.
+- `waha.js` — kirim teks/media, cek sesi, ambil QR pairing.
+- `cloudapi.js` — disiapkan untuk opsi resmi di masa depan.
+- `manual.js` — fallback `wa.me` agar fitur lama tetap jalan.
+- Tabel `wa_outbox` — antrean pesan + status/retry supaya pengiriman tidak
+  memblokir transaksi dan tidak hilang saat sesi putus.
+- Service `waha` di `docker-compose.yml` + volume sesi persisten.
+- Env: `WA_DRIVER`, `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`.
+
+Risiko & mitigasi: gunakan **nomor khusus** (bukan nomor pribadi owner), kirim
+hanya pesan transaksional (rekap & tagihan), beri rate-limit/jeda, dan sediakan
+kill-switch. Jika butuh kepatuhan penuh atau volume besar, aktifkan driver
+Cloud API tanpa mengubah logika bisnis.
+
+### 8.3 Batasan saat ini
 
 - Bundle frontend ~970KB (html5-qrcode) — kandidat code-split/lazy load lanjutan
   (kamera sudah lazy-load).
-- Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — sesuai keputusan produk.
-- Retur = **void struk penuh**; belum ada retur parsial per item.
-- Belum ada multi-toko & hutang ke suplier (V3).
+- Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — akan digantikan
+  rencana 8.2.
+- Retur = **void struk penuh**; belum ada retur parsial per item (rencana 8.1 #4).
+- Belum ada multi-toko & hutang ke suplier (rencana 8.1 #2 dan #8).
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat
   `docs/e2e-ui.mjs`.

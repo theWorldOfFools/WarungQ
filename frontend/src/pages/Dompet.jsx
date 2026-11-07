@@ -52,7 +52,7 @@ export default function Dompet() {
   const statusKeuangan = useMemo(() => {
     if (!data) return null;
     const untung = Number(data.untung_setelah_pengeluaran ?? data.perkiraan_untung_bersih ?? 0);
-    const masuk = Number(data.uang_masuk || 0) + Number(data.penjualan_kasbon || 0);
+    const masuk = Number(data.uang_masuk || 0) + Number(data.uang_masuk_non_tunai || 0) + Number(data.penjualan_kasbon || 0);
     if (masuk === 0) return { label: 'Belum ada jualan', tone: 'slate', saran: 'Mulai jualan lewat menu Kasir ya.' };
     if (untung <= 0) return { label: 'Perlu hemat modal', tone: 'amber', saran: 'Untung tipis — cek Modal Beli dan Pengeluaran.' };
     if (untung / Math.max(masuk, 1) < 0.1) return { label: 'Cukup stabil', tone: 'sky', saran: 'Jualan jalan, untung masih bisa ditebalkan.' };
@@ -73,6 +73,7 @@ export default function Dompet() {
       toko: pengaturan.namaToko || 'Warung Saya',
       tanggal: data.tanggal,
       uangMasuk: data.uang_masuk,
+      nonTunai: data.uang_masuk_non_tunai,
       kasbon: data.penjualan_kasbon,
       untung: data.perkiraan_untung_bersih,
       pengeluaran: data.pengeluaran_harian,
@@ -117,6 +118,9 @@ export default function Dompet() {
               <p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-100"><Wallet size={15} /> Uang Masuk Tunai</p>
               <p className="mt-1 text-3xl font-extrabold tracking-tight">{rupiah(data.uang_masuk)}</p>
               <p className="mt-1 text-[13px] text-emerald-100 flex items-center gap-1.5"><ReceiptText size={14} /> dari {data.jumlah_struk} struk belanja</p>
+              {Number(data.uang_masuk_non_tunai || 0) > 0 && (
+                <p className="mt-0.5 text-[13px] text-emerald-100">+ Non-tunai {rupiah(data.uang_masuk_non_tunai)}</p>
+              )}
             </motion.div>
 
             <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-900 shadow-card border border-amber-300/60">

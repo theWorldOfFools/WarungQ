@@ -22,6 +22,7 @@ export function drafRekapHarian({
   toko,
   tanggal,
   uangMasuk,
+  nonTunai = 0,
   kasbon = 0,
   untung = 0,
   pengeluaran = 0,
@@ -36,6 +37,7 @@ export function drafRekapHarian({
     ``,
     `• Uang masuk tunai: ${rupiahTeks(uangMasuk)}`,
   ];
+  if (Number(nonTunai) > 0) baris.push(`• Uang masuk non-tunai: ${rupiahTeks(nonTunai)}`);
   if (Number(kasbon) > 0) baris.push(`• Jual kasbon (belum masuk kas): ${rupiahTeks(kasbon)}`);
   if (Number(pengeluaran) > 0) {
     baris.push(`• Untung kotor: ${rupiahTeks(untung)}`);
@@ -59,6 +61,7 @@ export function drafRekapPeriode({
   dari,
   sampai,
   uangMasukTunai,
+  nonTunai = 0,
   penjualanKasbon,
   untungKotor,
   pengeluaran,
@@ -73,6 +76,7 @@ export function drafRekapPeriode({
     ``,
     `• Uang masuk tunai: ${rupiahTeks(uangMasukTunai)}`,
   ];
+  if (Number(nonTunai) > 0) baris.push(`• Uang masuk non-tunai: ${rupiahTeks(nonTunai)}`);
   if (Number(penjualanKasbon) > 0) baris.push(`• Jual kasbon: ${rupiahTeks(penjualanKasbon)}`);
   baris.push(`• Untung kotor: ${rupiahTeks(untungKotor)}`);
   baris.push(`• Pengeluaran: ${rupiahTeks(pengeluaran)}`);

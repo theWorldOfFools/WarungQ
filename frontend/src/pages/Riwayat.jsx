@@ -12,11 +12,13 @@ import {
   NotebookPen,
   Ban,
   X,
+  CreditCard,
 } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { Card, PageHeader, EmptyState, Notice, StatusBadge, Wadah } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../components/cn';
+import { labelMetode } from '../data/metodeBayar';
 
 const LIMIT = 50;
 
@@ -39,6 +41,9 @@ const PRESETS = [
 const FILTER_BAYAR = [
   { id: '', label: 'Semua' },
   { id: 'tunai', label: 'Tunai' },
+  { id: 'qris', label: 'QRIS' },
+  { id: 'transfer', label: 'Transfer' },
+  { id: 'ewallet', label: 'E-Wallet' },
   { id: 'kasbon', label: 'Kasbon' },
 ];
 
@@ -284,8 +289,10 @@ export default function Riwayat() {
                         <StatusBadge tone="rose"><Ban size={13} /> Dibatalkan</StatusBadge>
                       ) : kasbon ? (
                         <StatusBadge tone="amber"><NotebookPen size={13} /> Kasbon</StatusBadge>
-                      ) : (
+                      ) : s.dibayar_via === 'tunai' ? (
                         <StatusBadge tone="emerald"><Wallet size={13} /> Tunai</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="sky"><CreditCard size={13} /> {labelMetode(s.dibayar_via)}</StatusBadge>
                       )}
                     </div>
                   </div>
@@ -294,6 +301,9 @@ export default function Riwayat() {
                     <p className="text-[13px] text-slate-600">
                       Atas nama <b>{s.kasbon_nama}</b> — belum dibayar.
                     </p>
+                  )}
+                  {s.referensi_bayar && (
+                    <p className="text-[13px] text-slate-500">Ref: {s.referensi_bayar}</p>
                   )}
                   {dibatalkan && s.alasan_void && (
                     <p className="text-[13px] text-rose-600 font-medium">Alasan: {s.alasan_void}</p>

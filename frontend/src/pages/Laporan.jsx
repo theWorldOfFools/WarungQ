@@ -13,6 +13,7 @@ import {
   Ban,
   Crown,
   Users,
+  CreditCard,
 } from 'lucide-react';
 import api, { rupiah } from '../api/client';
 import { Card, PageHeader, StatusBadge, Skeleton, Wadah } from '../components/ui';
@@ -20,6 +21,7 @@ import GrafikHarian from '../components/GrafikHarian';
 import { usePengaturan } from '../context/PengaturanContext';
 import { linkWA, drafRekapPeriode } from '../utils/wa';
 import { cn } from '../components/cn';
+import { labelMetode } from '../data/metodeBayar';
 
 const fmt = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -98,6 +100,7 @@ export default function Laporan() {
       dari: data.dari,
       sampai: data.sampai,
       uangMasukTunai: data.uang_masuk_tunai,
+      nonTunai: data.uang_masuk_non_tunai,
       penjualanKasbon: data.penjualan_kasbon,
       untungKotor: data.untung_kotor,
       pengeluaran: data.pengeluaran,
@@ -180,6 +183,9 @@ export default function Laporan() {
               <p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-100"><Wallet size={15} /> Uang Masuk Tunai</p>
               <p className="mt-1 text-2xl font-extrabold tracking-tight">{rupiah(data.uang_masuk_tunai)}</p>
               <p className="mt-1 text-[13px] text-emerald-100 flex items-center gap-1.5"><ReceiptText size={14} /> {data.jumlah_struk} struk</p>
+              {Number(data.uang_masuk_non_tunai || 0) > 0 && (
+                <p className="mt-0.5 text-[13px] text-emerald-100">+ Non-tunai {rupiah(data.uang_masuk_non_tunai)}</p>
+              )}
             </motion.div>
 
             <motion.div whileHover={{ y: -3 }} className="rounded-2xl p-5 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-900 shadow-card border border-amber-300/60">
@@ -207,6 +213,31 @@ export default function Laporan() {
             <StatusBadge tone="sky">Periode {data.dari} s/d {data.sampai}</StatusBadge>
             {data.jumlah_void > 0 && (
               <StatusBadge tone="rose"><Ban size={13} /> {data.jumlah_void} struk dibatalkan (tidak dihitung)</StatusBadge>
+            )}
+          </Card>
+
+          {/* Rekonsiliasi metode bayar */}
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-extrabold flex items-center gap-1.5">
+                <CreditCard size={17} className="text-sky-600" /> Rekonsiliasi metode bayar
+              </h2>
+              <span className="text-xs font-semibold text-slate-400">Uang masuk per metode</span>
+            </div>
+            {(data.per_metode_bayar || []).length === 0 ? (
+              <p className="text-sm text-slate-500">Belum ada transaksi di periode ini.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-2">
+                {(data.per_metode_bayar || []).map((m) => (
+                  <div key={m.metode} className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-2.5">
+                    <div>
+                      <p className="font-bold text-sm">{labelMetode(m.metode)}</p>
+                      <p className="text-xs text-slate-500">{m.jumlah_struk} struk</p>
+                    </div>
+                    <b className="text-emerald-700">{rupiah(m.total)}</b>
+                  </div>
+                ))}
+              </div>
             )}
           </Card>
 

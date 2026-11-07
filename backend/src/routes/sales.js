@@ -6,17 +6,37 @@ const { kodeStruk, normalisasiWA } = require('../utils/warung');
 const router = express.Router();
 router.use(authRequired);
 
+const METODE_BAYAR = ['tunai', 'kasbon', 'qris', 'transfer', 'ewallet'];
+const METODE_NON_TUNAI = ['qris', 'transfer', 'ewallet'];
+const LABEL_METODE = {
+  tunai: 'Tunai',
+  qris: 'QRIS',
+  transfer: 'Transfer',
+  ewallet: 'E-Wallet',
+  kasbon: 'Kasbon',
+};
+
 // POST /api/sales — kasir & owner saja. Gudang DILARANG.
 // Body: { items: [{id|barcode, qty}], uang_diterima, dibayar_via, kasbon? }
 // - dibayar_via='tunai'  : uang diterima wajib >= total, kembalian dihitung server.
 // - dibayar_via='kasbon' : sekaligus membuat catatan utang (atomik, satu transaksi).
 // Stok dipotong transaksional.
 router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
-  const { items = [], uang_diterima = 0, dibayar_via = 'tunai', kasbon = null } = req.body;
+  const {
+    items = [],
+    uang_diterima = 0,
+    dibayar_via = 'tunai',
+    kasbon = null,
+    referensi_bayar = '',
+  } = req.body;
   if (!Array.isArray(items) || items.length === 0)
     return res.status(400).json({ pesan: 'Keranjang masih kosong.' });
-  if (!['tunai', 'kasbon'].includes(dibayar_via))
-    return res.status(400).json({ pesan: "Pembayaran harus 'tunai' atau 'kasbon'." });
+  if (!METODE_BAYAR.includes(dibayar_via))
+    return res.status(400).json({
+      pesan: `Pembayaran harus salah satu: ${METODE_BAYAR.join(', ')}.`,
+    });
+  const nonTunai = METODE_NON_TUNAI.includes(dibayar_via);
+  const referensi = String(referensi_bayar || '').trim().slice(0, 120);
 
   // Siapkan data kasbon sebelum transaksi agar gagal cepat bila tidak lengkap.
   let kasbonNama = null;
@@ -54,16 +74,20 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
       baris.push({ p, qty });
     }
 
-    const diterima = dibayar_via === 'tunai' ? Number(uang_diterima || 0) : 0;
+    // Tunai: uang diterima dihitung & kembalian dikembalikan.
+    // Non-tunai: dianggap lunas tepat sebesar total (kembalian 0).
+    // Kasbon: belum ada uang masuk.
+    const diterima =
+      dibayar_via === 'tunai' ? Number(uang_diterima || 0) : nonTunai ? total_masuk : 0;
     if (dibayar_via === 'tunai' && diterima < total_masuk)
       throw new Error(`Uang kurang. Total ${total_masuk}, diterima ${diterima}.`);
     const kembalian = dibayar_via === 'tunai' ? diterima - total_masuk : 0;
 
     const kode = kodeStruk();
     const { rows: srows } = await client.query(
-      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id]
+      `INSERT INTO sales (kode_struk, total_masuk, total_modal, uang_diterima, kembalian, dibayar_via, kasir_id, referensi_bayar)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [kode, total_masuk, total_modal, diterima, kembalian, dibayar_via, req.user.id, referensi]
     );
     const sale = srows[0];
 
@@ -97,7 +121,9 @@ router.post('/', requireRole('owner', 'kasir'), async (req, res) => {
     const pesanSukses =
       dibayar_via === 'kasbon'
         ? `Jualan kasbon tersimpan atas nama ${kasbonNama}.`
-        : `Jualan tersimpan. Kembalian: Rp${kembalian.toLocaleString('id-ID')}`;
+        : nonTunai
+          ? `Jualan tersimpan — dibayar ${LABEL_METODE[dibayar_via]}.`
+          : `Jualan tersimpan. Kembalian: Rp${kembalian.toLocaleString('id-ID')}`;
     // Sensor modal untuk kasir: jangan kirim total_modal/untung.
     if (req.user.role !== 'owner') {
       const { total_modal: _m, perkiraan_untung: _u, ...aman } = sale;
@@ -142,7 +168,7 @@ router.get('/', requireRole('owner', 'kasir'), async (req, res) => {
     params.push(`%${q}%`);
     where.push(`s.kode_struk ILIKE $${params.length}`);
   }
-  if (['tunai', 'kasbon'].includes(dibayar_via)) {
+  if (METODE_BAYAR.includes(dibayar_via)) {
     params.push(dibayar_via);
     where.push(`s.dibayar_via = $${params.length}`);
   }

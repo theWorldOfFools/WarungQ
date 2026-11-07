@@ -14,6 +14,7 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
   const tanggal = isTanggal(req.query.tanggal) ? req.query.tanggal : new Date().toISOString().slice(0, 10);
   const { rows: ringkas } = await pool.query(
     `SELECT COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via='tunai'),0)::int AS uang_masuk,
+            COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via IN ('qris','transfer','ewallet')),0)::int AS uang_masuk_non_tunai,
             COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via='kasbon'),0)::int AS penjualan_kasbon,
             COUNT(*) FILTER (WHERE dibayar_via='kasbon')::int AS jumlah_struk_kasbon,
             COALESCE(SUM(total_modal),0)::int AS total_modal,
@@ -24,6 +25,14 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
   );
   const { rows: pengeluaran } = await pool.query(
     `SELECT COALESCE(SUM(jumlah),0)::int AS pengeluaran FROM expenses WHERE tanggal = $1`,
+    [tanggal]
+  );
+  // Rekonsiliasi per metode bayar: tunai, QRIS, transfer, e-wallet, kasbon.
+  const { rows: perMetode } = await pool.query(
+    `SELECT dibayar_via AS metode, COUNT(*)::int AS jumlah_struk,
+            COALESCE(SUM(total_masuk),0)::int AS total
+     FROM sales WHERE voided_at IS NULL AND created_at::date = $1
+     GROUP BY dibayar_via ORDER BY total DESC`,
     [tanggal]
   );
   const { rows: laris } = await pool.query(
@@ -46,6 +55,7 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
   res.json({
     tanggal,
     uang_masuk: ringkas[0].uang_masuk,
+    uang_masuk_non_tunai: ringkas[0].uang_masuk_non_tunai,
     penjualan_kasbon: ringkas[0].penjualan_kasbon,
     jumlah_struk_kasbon: ringkas[0].jumlah_struk_kasbon,
     total_modal: ringkas[0].total_modal,
@@ -54,6 +64,7 @@ router.get('/harian', requireRole('owner'), async (req, res) => {
     untung_setelah_pengeluaran: ringkas[0].perkiraan_untung_bersih - pengeluaranHarian,
     jumlah_struk: ringkas[0].jumlah_struk,
     produk_terlaris: laris,
+    per_metode_bayar: perMetode,
     utang_tetangga_aktif: kasbon[0].total_utang_aktif,
     utang_jatuh_tempo: { jumlah: tempo[0].jumlah, total_sisa: tempo[0].total_sisa },
   });
@@ -73,6 +84,7 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
 
   const { rows: ringkas } = await pool.query(
     `SELECT COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via='tunai'),0)::int AS uang_masuk_tunai,
+            COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via IN ('qris','transfer','ewallet')),0)::int AS uang_masuk_non_tunai,
             COALESCE(SUM(total_masuk) FILTER (WHERE dibayar_via='kasbon'),0)::int AS penjualan_kasbon,
             COALESCE(SUM(total_modal),0)::int AS total_modal,
             COALESCE(SUM(perkiraan_untung),0)::int AS untung_kotor,
@@ -88,6 +100,7 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
   const { rows: seri } = await pool.query(
     `SELECT to_char(d::date, 'YYYY-MM-DD') AS tanggal,
             COALESCE(SUM(s.total_masuk) FILTER (WHERE s.dibayar_via='tunai'),0)::int AS uang_masuk,
+            COALESCE(SUM(s.total_masuk) FILTER (WHERE s.dibayar_via IN ('qris','transfer','ewallet')),0)::int AS non_tunai,
             COALESCE(SUM(s.perkiraan_untung),0)::int AS untung
      FROM generate_series($1::date, $2::date, '1 day') d
      LEFT JOIN sales s ON s.created_at::date = d AND s.voided_at IS NULL
@@ -117,6 +130,14 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
      GROUP BY u.nama_pengguna ORDER BY uang_masuk DESC`,
     [dari, sampai]
   );
+  // Rekonsiliasi per metode bayar untuk periode.
+  const { rows: perMetode } = await pool.query(
+    `SELECT dibayar_via AS metode, COUNT(*)::int AS jumlah_struk,
+            COALESCE(SUM(total_masuk),0)::int AS total
+     FROM sales WHERE voided_at IS NULL AND created_at::date BETWEEN $1 AND $2
+     GROUP BY dibayar_via ORDER BY total DESC`,
+    [dari, sampai]
+  );
   const { rows: strukVoid } = await pool.query(
     `SELECT COUNT(*)::int AS jumlah FROM sales
      WHERE voided_at IS NOT NULL AND created_at::date BETWEEN $1 AND $2`,
@@ -128,6 +149,7 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
     dari,
     sampai,
     uang_masuk_tunai: ringkas[0].uang_masuk_tunai,
+    uang_masuk_non_tunai: ringkas[0].uang_masuk_non_tunai,
     penjualan_kasbon: ringkas[0].penjualan_kasbon,
     jumlah_struk_kasbon: ringkas[0].jumlah_struk_kasbon,
     total_modal: ringkas[0].total_modal,
@@ -140,6 +162,7 @@ router.get('/rentang', requireRole('owner'), async (req, res) => {
     produk_terlaris: laris,
     pengeluaran_per_kategori: kategoriPengeluaran,
     per_kasir: perKasir,
+    per_metode_bayar: perMetode,
   });
 });
 
