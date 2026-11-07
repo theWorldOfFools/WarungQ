@@ -39,6 +39,14 @@ function kodeStruk() {
   return `WQ-${tgl}-${Math.floor(Math.random() * 900 + 100)}`;
 }
 
+// Kode pembelian kulakan: KUL-YYYYMMDD-HHMMSS-XXX
+function kodeKulakan() {
+  const d = new Date();
+  const p = (x) => String(x).padStart(2, '0');
+  const tgl = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `KUL-${tgl}-${Math.floor(Math.random() * 900 + 100)}`;
+}
+
 // Sensor modal_beli untuk kasir/gudang: jangan bocorkan ke frontend.
 function sensorProduk(row, role) {
   if (role === 'owner') return row;
@@ -46,4 +54,4 @@ function sensorProduk(row, role) {
   return rest;
 }
 
-module.exports = { rupiah, normalisasiWA, linkWA, drafTagihan, kodeStruk, sensorProduk };
+module.exports = { rupiah, normalisasiWA, linkWA, drafTagihan, kodeStruk, kodeKulakan, sensorProduk };

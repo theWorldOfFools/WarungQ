@@ -13,6 +13,7 @@ import Kasir from './pages/Kasir';
 import Riwayat from './pages/Riwayat';
 import Stok from './pages/Stok';
 import Suplier from './pages/Suplier';
+import Kulakan from './pages/Kulakan';
 import StrukPage from './pages/Struk';
 import Dompet from './pages/Dompet';
 import Pengeluaran from './pages/Pengeluaran';
@@ -97,6 +98,7 @@ function Rute() {
         <Route path="/riwayat" element={<Guard boleh={['owner', 'kasir']}><Riwayat /></Guard>} />
         <Route path="/stok" element={<Guard boleh={['owner', 'kasir', 'gudang']}><Stok /></Guard>} />
         <Route path="/suplier" element={<Guard boleh={['owner', 'gudang']}><Suplier /></Guard>} />
+        <Route path="/kulakan" element={<Guard boleh={['owner', 'gudang']}><Kulakan /></Guard>} />
         <Route path="/struk/:id" element={<Guard boleh={['owner', 'kasir']}><StrukPage /></Guard>} />
         <Route path="/pengeluaran" element={<Guard boleh={['owner']}><Pengeluaran /></Guard>} />
         <Route path="/kasbon" element={<Guard boleh={['owner']}><Kasbon /></Guard>} />

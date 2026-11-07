@@ -267,7 +267,7 @@ frontend/src/
   pages/*.jsx                # Dompet, Kasir, Riwayat, Stok, Suplier, Kasbon,
                              #   Pengeluaran, Laporan, Orang, Pengaturan, Struk, Login
 docs/
-  uji-api.mjs                # uji API & RBAC otomatis (33 skenario)
+  uji-api.mjs                # uji API & RBAC otomatis (42 skenario)
   e2e-ui.mjs                 # uji E2E UI + screenshot otomatis (Playwright)
   screenshots/*.png          # bukti visual (dipakai di laporan bawah)
 ```
@@ -284,6 +284,8 @@ docs/
 | `debts` + `debt_payments` | utang tetangga + cicilan, `sale_id` menautkan ke struk asal |
 | `expenses` | pengeluaran warung per kategori/tanggal |
 | `suppliers` + `product_suppliers` + riwayat | multi-suplier per barang + harga beli |
+| `supplier_purchases` + `supplier_purchase_items` | kulakan per suplier: total, dibayar, sisa, jatuh tempo, snapshot barang |
+| `supplier_payments` | cicilan bayar hutang kulakan + pelaku |
 | `app_settings` | setelan aplikasi di server |
 | `wa_outbox` | (rencana V2.0) antrean pesan WhatsApp + status kirim/retry |
 
@@ -325,6 +327,12 @@ GET  /api/reports/harian?tanggal=YYYY-MM-DD      (owner only)
 GET  /api/reports/rentang?dari=&sampai=          (owner only)
 
 GET/POST/DELETE /api/expenses?dari=&sampai=&kategori=   (owner only)
+
+GET  /api/purchases?dari=&sampai=&supplier_id=&status=&q=   (owner, gudang)
+GET  /api/purchases/ringkasan                (owner, gudang)
+GET  /api/purchases/:id                       (detail + barang + riwayat bayar)
+POST /api/purchases {supplier_id, items, jatuh_tempo}   (owner, gudang; stok bertambah)
+POST /api/purchases/:id/bayar {jumlah_bayar}  (owner only; cicilan hutang)
 
 GET  /api/debts
 POST /api/debts
@@ -499,7 +507,7 @@ laporan akuntansi berat.
 | # | Fitur | Kenapa relevan untuk UMKM Indonesia | Dampak teknis | Status |
 |---|---|---|---|---|
 | 1 | **Pembayaran non-tunai (QRIS/transfer/e-wallet)** + rekonsiliasi | QRIS sudah lazim di warung/kios; saat ini `sales.dibayar_via` hanya `tunai`/`kasbon`, jadi uang non-tunai tidak tercatat rapi | Tambah metode bayar + bukti + laporan per metode | ✅ Selesai |
-| 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ⏳ Rencana |
+| 2 | **Hutang ke suplier + pembelian (kulakan)** | Kulakan bon adalah praktik umum; menu Suplier baru menyimpan harga, belum transaksi hutang | Tabel purchases/payments, jatuh tempo, cicilan, tautan ke suplier | ✅ Selesai |
 | 3 | **Tutup kasir / shift + selisih kas** | Sumber konflik pemilik–kasir paling sering; belum ada kas awal, rekap shift, atau serah terima | Tabel shift, rekap per kasir, input uang fisik | ⏳ Rencana |
 | 4 | **Retur parsial / barang rusak / expired** | Sekarang retur hanya void struk penuh; barang rusak/expired tidak bisa dicatat | Alur retur per item + alasan, memakai `stock_movements` | ⏳ Rencana |
 | 5 | **WhatsApp otomatis + rekap terjadwal** | Reminder kasbon & rekap harian via `wa.me` manual sering terlupa | Adapter WA + `wa_outbox` + scheduler (lihat 8.2) | ⏳ Rencana |
@@ -547,6 +555,6 @@ Cloud API tanpa mengubah logika bisnis.
 - Kasbon WA masih link `wa.me` manual (tanpa API otomatis) — akan digantikan
   rencana 8.2.
 - Retur = **void struk penuh**; belum ada retur parsial per item (rencana 8.1 #4).
-- Belum ada multi-toko & hutang ke suplier (rencana 8.1 #2 dan #8).
+- Belum ada multi-toko (rencana 8.1 #8). Hutang ke suplier sudah aktif di 8.1 #2.
 - Uji E2E UI belum terpasang sebagai CI — saat ini dijalankan manual lewat
   `docs/e2e-ui.mjs`.
